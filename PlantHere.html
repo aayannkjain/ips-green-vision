@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plant Here | IPS Green Vision</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif;background:#0b0f19;color:white}
+
+
+
+
+
+#container{display:flex;width:100%;height:calc(100vh - 60px);margin-top:60px}
+#sidebar{width:380px;background:#111827;border-right:1px solid #222;padding:20px;overflow-y:auto;flex-shrink:0}
+#sidebar h1{font-size:24px;margin-bottom:6px;color:#22c55e}
+#sidebar .subtitle{color:#9ca3af;margin-bottom:18px;line-height:1.5;font-size:14px}
+#locateBtn{width:100%;padding:14px;margin-bottom:8px;background:#22c55e;color:black;border:none;border-radius:10px;cursor:pointer;font-weight:bold;font-size:15px}
+#locateBtn:hover{background:#16a34a}
+#locationInfo{color:#9ca3af;font-size:13px;margin-bottom:12px;min-height:18px}
+.radius-row{display:flex;gap:6px;margin-bottom:15px}
+.radius-btn{flex:1;padding:8px;border:1px solid #333;border-radius:8px;background:#1f2937;color:#9ca3af;cursor:pointer;font-size:13px;font-weight:600;text-align:center}
+.radius-btn.active{background:#22c55e22;color:#22c55e;border-color:#22c55e55}
+.map-toggle{display:flex;gap:6px;margin-bottom:15px}
+.map-toggle button{flex:1;padding:8px;border:1px solid #333;border-radius:8px;background:#1f2937;color:#9ca3af;cursor:pointer;font-size:12px;font-weight:600}
+.map-toggle button.active{background:#22c55e;color:black;border-color:#22c55e}
+#spotLoading{display:none;text-align:center;padding:20px;color:#9ca3af}
+#spotLoading .spinner{width:30px;height:30px;border:3px solid #333;border-top:3px solid #22c55e;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#spotResults{display:none}
+#spotResults h3{font-size:14px;color:#22c55e;margin-bottom:4px}
+#spotSummary{font-size:12px;color:#6b7280;margin-bottom:12px}
+.spot-card{background:#1f2937;padding:12px 14px;border-radius:10px;cursor:pointer;transition:0.2s;border:1px solid transparent;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.spot-card:hover{border-color:#22c55e;transform:translateY(-1px)}
+.spot-card.active{border-color:#22c55e;background:#1a2e1f}
+.spot-num{width:28px;height:28px;border-radius:50%;background:#22c55e;color:black;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0}
+.spot-info{flex:1;min-width:0}
+.spot-name{font-size:14px;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spot-meta{font-size:12px;color:#9ca3af}
+.spot-type-tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#3b82f622;color:#60a5fa;font-weight:600;margin-right:4px}
+.spot-score-wrap{text-align:center;flex-shrink:0}
+.spot-score{font-size:22px;font-weight:800}
+.spot-score-label{font-size:10px;color:#6b7280}
+#spotDetail{display:none;background:#1f2937;border-radius:12px;padding:18px;margin-bottom:15px;border:1px solid #2a3444}
+#spotDetail h2{font-size:16px;margin-bottom:10px;color:#22c55e}
+.main-score{text-align:center;padding:14px;margin-bottom:12px;border-radius:12px;background:#0d1117;border:1px solid #2a3444}
+.main-score .big-number{font-size:46px;font-weight:800;line-height:1}
+.main-score .big-label{font-size:12px;color:#9ca3af;margin-top:3px}
+.main-score .verdict{font-size:14px;font-weight:700;margin-top:6px;padding:3px 12px;border-radius:20px;display:inline-block}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.detail-item{background:#0d1117;padding:9px;border-radius:8px;border:1px solid #2a3444}
+.detail-item .label{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px}
+.detail-item .value{font-size:14px;font-weight:600;margin-top:2px}
+.recommendation{margin-top:12px;padding:14px;border-radius:10px;background:#0d1117;border:1px solid #2a3444}
+.recommendation h3{font-size:13px;color:#22c55e;margin-bottom:6px}
+.recommendation p{font-size:13px;color:#d1d5db;line-height:1.6}
+.species-list{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+.species-tag{background:#1a3a2a;color:#22c55e;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600}
+.score-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #2a3444;font-size:13px}
+.score-label{color:#9ca3af}
+.score-value{font-weight:bold}
+.score-bar{width:100%;height:6px;background:#2a3444;border-radius:6px;margin-top:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:6px;transition:width 0.8s ease}
+.instructions{background:#1a2332;border:1px solid #22c55e33;border-radius:12px;padding:16px;margin-bottom:15px}
+.instructions h3{color:#22c55e;font-size:14px;margin-bottom:8px}
+.instructions ol{padding-left:18px;color:#d1d5db;font-size:13px;line-height:1.8}
+.stat-card{background:#1f2937;padding:15px;border-radius:12px;margin-bottom:12px;border:1px solid #2a3444}
+.stat-card h3{color:#22c55e;margin-bottom:5px;font-size:14px}
+.stat-card p{color:#9ca3af;font-size:13px;line-height:1.5}
+#map-area{flex:1;position:relative}
+#map{width:100%;height:100%}
+.leaflet-tooltip{background:#111827;color:white;border:1px solid #333;border-radius:8px;padding:8px;font-family:inherit}
+.directions-btn{display:block;width:100%;padding:14px;margin-top:10px;background:#22c55e;color:black;text-align:center;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none;transition:0.2s}
+.directions-btn:hover{background:#16a34a;transform:translateY(-1px)}
+.directions-btn--drive{background:#3b82f6;color:white}
+.directions-btn--drive:hover{background:#2563eb}
+</style>
+</head>
+<body>
+<div id="eco-navbar"></div>
+<div id="container">
+<div id="sidebar">
+  <h1>📍 Plant a Tree Near You</h1>
+  <p class="subtitle">Automatically finds real parks, open spaces, roadsides, and empty lots near you where trees can be planted.</p>
+  <button id="locateBtn">📍 Find Planting Spots Near Me</button>
+  <div id="locationInfo">⏳ Loading data...</div>
+  <div class="radius-row">
+    <div class="radius-btn" data-km="1">1 km</div>
+    <div class="radius-btn" data-km="2">2 km</div>
+    <div class="radius-btn active" data-km="3">3 km</div>
+    <div class="radius-btn" data-km="5">5 km</div>
+  </div>
+  <div class="map-toggle">
+    <button class="mtog" data-layer="satellite">🛰 Satellite</button>
+    <button class="mtog active" data-layer="street">🗺 Street</button>
+    <button class="mtog" data-layer="dark">🌑 Dark</button>
+  </div>
+  <div id="spotLoading"><div class="spinner"></div><p>Scanning for planting spots...</p></div>
+  <div id="spotDetail"></div>
+  <div id="spotResults"></div>
+  <div id="defaultContent">
+    <div class="instructions">
+      <h3>How It Works</h3>
+      <ol>
+        <li>Click <b>"Find Planting Spots Near Me"</b></li>
+        <li>Choose your search radius (1–5 km)</li>
+        <li>The AI scans for parks, open spaces, empty lots, and roadsides near you</li>
+        <li>Each spot is scored for tree planting suitability</li>
+        <li>Pick a spot and go plant a tree!</li>
+      </ol>
+    </div>
+    <div class="stat-card"><h3>🛰 Data Sources</h3><p>OpenStreetMap for locations · Google Earth Engine for environmental analysis</p></div>
+    <div class="stat-card"><h3>🧠 AI Scoring</h3><p>Each spot is scored based on temperature, rainfall, NDVI, tree cover, elevation, and land type.</p></div>
+  </div>
+</div>
+<div id="map-area"><div id="map"></div></div>
+</div>
+
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="navbarsdg.js"></script>
+<script>
+// ===== INITIALIZE MAP IMMEDIATELY =====
+var map = L.map("map").setView([20,0],3);
+var tileLayers = {
+  street: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}),
+  satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{attribution:"© Esri",maxZoom:19}),
+  dark: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{attribution:"© OpenStreetMap",maxZoom:19})
+};
+tileLayers.street.addTo(map);
+var activeLayer = "street";
+setTimeout(function(){map.invalidateSize()},200);
+</script>
+<script src="eco_data.js"></script>
+<script>
+(function(){
+"use strict";
+
+// ===== AI ENGINE =====
+var AI={
+  LANDCOVER:{10:{n:"Tree Cover",p:0},20:{n:"Shrubland",p:0},30:{n:"Grassland",p:0},40:{n:"Cropland",p:15},50:{n:"Built-up",p:30},60:{n:"Bare/Sparse",p:10},80:{n:"Water",p:100},90:{n:"Wetland",p:60},95:{n:"Mangroves",p:0},100:{n:"Snow/Ice",p:100}},
+  cs:function(t,r){if(t===null||r===null)return null;var ts;if(t>=10&&t<=28)ts=100;else if(t>=5&&t<10)ts=60+(t-5)*8;else if(t>28&&t<=35)ts=100-(t-28)*10;else if(t>=0&&t<5)ts=30+t*6;else if(t>35)ts=Math.max(0,30-(t-35)*10);else ts=Math.max(0,30+t*6);var rs;if(r>=500&&r<=2500)rs=100;else if(r>=300&&r<500)rs=50+(r-300)*0.25;else if(r>2500&&r<=4000)rs=100-(r-2500)*0.02;else if(r>=100&&r<300)rs=20+(r-100)*0.15;else if(r>4000)rs=70;else rs=Math.max(0,r*0.2);return Math.round(ts*0.45+rs*0.55)},
+  vs:function(n,tc){if(n===null)return null;var ns;if(n>=0.5)ns=100;else if(n>=0.3)ns=60+(n-0.3)*200;else if(n>=0.15)ns=30+(n-0.15)*200;else if(n>=0)ns=n*200;else ns=0;var tcs=tc!==null?Math.min(100,tc*1.2):50;return Math.round(ns*0.65+tcs*0.35)},
+  ts:function(e,lc){if(e===null)return null;var es;if(e>=0&&e<=1500)es=100;else if(e>1500&&e<=2500)es=100-(e-1500)*0.05;else if(e>2500&&e<=3500)es=50-(e-2500)*0.03;else if(e>3500)es=Math.max(0,20-(e-3500)*0.02);else es=80;var l=this.LANDCOVER[lc]||{p:20};return Math.round(es*0.5+Math.max(0,100-l.p)*0.5)},
+  suit:function(c){var t=pn(c.temperature_C),r=pn(c.rainfall),n=pn(c.ndvi),tc=pn(c.treecover),e=pn(c.elevation),lc=pn(c.landcover);var cs=this.cs(t,r),vs=this.vs(n,tc),ts=this.ts(e,lc);if(cs===null||vs===null||ts===null)return null;var pen=0;if(tc!==null&&tc>70)pen=(tc-70)*0.5;if(lc===80||lc===100)return 0;var s=cs*0.40+vs*0.25+ts*0.35;return Math.round(Math.min(100,Math.max(0,s-pen)))},
+  species:function(t,r){if(t===null||r===null)return[];if(t>=22&&r>=1500)return["Teak","Neem","Banyan","Mahogany","Bamboo"];if(t>=22&&r>=500)return["Neem","Babool","Eucalyptus","Gulmohar","Jamun"];if(t>=15&&t<22&&r>=800)return["Oak","Pine","Cedar","Maple","Chestnut"];if(t>=15&&r<800)return["Olive","Cork Oak","Cypress","Eucalyptus","Carob"];if(t>=5&&t<15&&r>=500)return["Oak","Beech","Birch","Spruce","Elm"];if(t>=0&&t<5)return["Spruce","Pine","Larch","Birch","Aspen"];if(r<300)return["Acacia","Date Palm","Tamarisk","Jojoba","Prosopis"];if(t<0)return["Siberian Larch","Dwarf Pine","Arctic Willow"];return["Native species"]},
+  verdict:function(s){if(s===null)return{t:"No Data",c:"#6b7280"};if(s>=75)return{t:"Highly Suitable",c:"#22c55e"};if(s>=50)return{t:"Suitable",c:"#84cc16"};if(s>=25)return{t:"Marginal",c:"#eab308"};return{t:"Not Suitable",c:"#ef4444"}},
+  zone:function(t,r){if(t===null)return"Unknown";if(t>=22&&r>=1500)return"Tropical Wet";if(t>=22&&r>=500)return"Tropical Dry";if(t>=22)return"Arid Hot";if(t>=15&&r>=800)return"Subtropical";if(t>=15)return"Mediterranean";if(t>=5&&r>=500)return"Temperate";if(t>=5)return"Semi-Arid";if(t>=0)return"Cold Temperate";return"Cold/Arctic"},
+  lcName:function(lc){return(this.LANDCOVER[lc]||{n:"Unknown"}).n}
+};
+function pn(v){if(v===""||v===undefined||v===null)return null;var n=Number(v);return isNaN(n)?null:n}
+function sc(s){return s===null?"#6b7280":s>=75?"#22c55e":s>=50?"#84cc16":s>=25?"#eab308":"#ef4444"}
+
+// ===== DATA =====
+var cities=[];
+if(typeof ECO_DATA!=="undefined"){
+  cities=ECO_DATA;
+  document.getElementById("locationInfo").innerHTML="✅ "+cities.length+" cities loaded — ready";
+} else {
+  document.getElementById("locationInfo").innerHTML='<span style="color:#ef4444">❌ eco_data.js not found in folder</span>';
+}
+
+// ===== LAYER TOGGLE =====
+document.querySelectorAll(".mtog").forEach(function(btn){
+  btn.addEventListener("click",function(){
+    var layer=this.dataset.layer;
+    if(layer===activeLayer) return;
+    map.removeLayer(tileLayers[activeLayer]);
+    tileLayers[layer].addTo(map);
+    activeLayer=layer;
+    document.querySelectorAll(".mtog").forEach(function(b){b.classList.remove("active")});
+    this.classList.add("active");
+  });
+});
+
+// ===== RADIUS =====
+var searchRadius=3;
+var userLat=null,userLng=null;
+document.querySelectorAll(".radius-btn").forEach(function(btn){
+  btn.addEventListener("click",function(){
+    document.querySelectorAll(".radius-btn").forEach(function(b){b.classList.remove("active")});
+    this.classList.add("active");
+    searchRadius=Number(this.dataset.km);
+    if(userLat!==null) searchForSpots(userLat,userLng);
+  });
+});
+
+// ===== STATE =====
+var spotMarkers=[];
+var userMarker=null;
+var radiusCircle=null;
+var nearestCity=null;
+var foundSpots=[];
+
+// ===== LOCATE BUTTON =====
+document.getElementById("locateBtn").addEventListener("click",function(){
+  var info=document.getElementById("locationInfo");
+  if(!navigator.geolocation){info.innerHTML="Geolocation not supported.";return}
+  if(cities.length===0){info.innerHTML='<span style="color:#ef4444">Data not loaded. Ensure eco_data.js is in the folder.</span>';return}
+  info.innerHTML="📡 Detecting your location...";
+
+  navigator.geolocation.getCurrentPosition(function(pos){
+    userLat=pos.coords.latitude;
+    userLng=pos.coords.longitude;
+
+    if(userMarker)map.removeLayer(userMarker);
+    if(radiusCircle)map.removeLayer(radiusCircle);
+
+    userMarker=L.marker([userLat,userLng],{
+      icon:L.divIcon({className:'',html:'<div style="background:#3b82f6;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 0 12px rgba(59,130,246,0.5)"></div>',iconSize:[18,18],iconAnchor:[9,9]})
+    }).addTo(map).bindPopup("📍 You are here").openPopup();
+
+    radiusCircle=L.circle([userLat,userLng],{radius:searchRadius*1000,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:0.06,weight:1,dashArray:'6,10'}).addTo(map);
+
+    map.flyTo([userLat,userLng],14,{duration:1.5});
+    searchForSpots(userLat,userLng);
+  },function(){info.innerHTML="❌ Location access denied. Allow location and try again."});
+});
+
+// ===== OVERPASS SEARCH =====
+function searchForSpots(lat,lng){
+  document.getElementById("spotLoading").style.display="block";
+  document.getElementById("spotResults").style.display="none";
+  document.getElementById("defaultContent").style.display="none";
+  document.getElementById("spotDetail").style.display="none";
+  document.getElementById("locationInfo").innerHTML="📡 Scanning "+searchRadius+"km radius...";
+
+  spotMarkers.forEach(function(m){map.removeLayer(m)});
+  spotMarkers=[];
+  foundSpots=[];
+
+  nearestCity=findNearestCity(lat,lng);
+  if(radiusCircle){map.removeLayer(radiusCircle);radiusCircle=L.circle([lat,lng],{radius:searchRadius*1000,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:0.06,weight:1,dashArray:'6,10'}).addTo(map)}
+
+  var r=searchRadius*1000;
+  var q='[out:json][timeout:25];('+
+    'node["leisure"="park"](around:'+r+','+lat+','+lng+');'+
+    'way["leisure"="park"](around:'+r+','+lat+','+lng+');'+
+    'way["leisure"="garden"](around:'+r+','+lat+','+lng+');'+
+    'node["leisure"="garden"](around:'+r+','+lat+','+lng+');'+
+    'way["landuse"="meadow"](around:'+r+','+lat+','+lng+');'+
+    'way["landuse"="grass"](around:'+r+','+lat+','+lng+');'+
+    'way["landuse"="recreation_ground"](around:'+r+','+lat+','+lng+');'+
+    'way["landuse"="village_green"](around:'+r+','+lat+','+lng+');'+
+    'way["landuse"="brownfield"](around:'+r+','+lat+','+lng+');'+
+    'way["landuse"="greenfield"](around:'+r+','+lat+','+lng+');'+
+    'way["natural"="scrub"](around:'+r+','+lat+','+lng+');'+
+    'node["highway"="bus_stop"](around:'+r+','+lat+','+lng+');'+
+    ');out center 80;';
+
+  fetch("https://overpass-api.de/api/interpreter", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: "data=" + encodeURIComponent(q)
+  })
+  .then(function(res){return res.json()})
+  .then(function(data){
+    document.getElementById("spotLoading").style.display="none";
+    processSpots(data.elements,lat,lng);
+  })
+  .catch(function(err){
+    document.getElementById("spotLoading").style.display="none";
+    document.getElementById("locationInfo").innerHTML="❌ Network error. Check internet connection.";
+    console.error(err);
+  });
+}
+
+function processSpots(elements,uLat,uLng){
+  var spots=[];var seen={};
+  elements.forEach(function(el){
+    var lat=el.lat||(el.center?el.center.lat:null);
+    var lng=el.lon||(el.center?el.center.lon:null);
+    if(!lat||!lng)return;
+    var key=lat.toFixed(4)+"_"+lng.toFixed(4);
+    if(seen[key])return;seen[key]=true;
+    var tags=el.tags||{};
+    var name=tags.name||tags["name:en"]||null;
+    var type=getType(tags);
+    spots.push({lat:lat,lng:lng,name:name,type:type.type,icon:type.icon,bonus:type.bonus,distance:haversineKm(uLat,uLng,lat,lng),tags:tags});
+  });
+
+  if(nearestCity){
+    var base=AI.suit(nearestCity);
+    spots.forEach(function(s){s.score=base!==null?Math.min(100,Math.max(0,base+s.bonus-Math.round(Math.min(10,s.distance*3)))):null});
+  }
+  spots.sort(function(a,b){return(b.score||0)-(a.score||0)});
+  spots=spots.slice(0,30);
+  foundSpots=spots;
+  renderList(spots);
+  addMarkers(spots);
+  document.getElementById("locationInfo").innerHTML="📍 Found <b>"+spots.length+"</b> spots within "+searchRadius+" km";
+}
+
+function getType(t){
+  if(t.leisure==="park")return{type:"Park",icon:"🌳",bonus:15};
+  if(t.leisure==="garden")return{type:"Garden",icon:"🌿",bonus:12};
+  if(t.landuse==="meadow")return{type:"Meadow",icon:"🌾",bonus:18};
+  if(t.landuse==="grass")return{type:"Grassland",icon:"🌱",bonus:16};
+  if(t.landuse==="recreation_ground")return{type:"Recreation Ground",icon:"🏟",bonus:10};
+  if(t.landuse==="village_green")return{type:"Village Green",icon:"🌿",bonus:14};
+  if(t.landuse==="brownfield")return{type:"Vacant Land",icon:"🏜",bonus:8};
+  if(t.landuse==="greenfield")return{type:"Open Land",icon:"🟩",bonus:14};
+  if(t.natural==="scrub")return{type:"Scrubland",icon:"🌿",bonus:12};
+  if(t.highway==="bus_stop")return{type:"Roadside",icon:"🚏",bonus:6};
+  return{type:"Open Space",icon:"📍",bonus:8};
+}
+
+// ===== RENDER LIST =====
+function renderList(spots){
+  var c=document.getElementById("spotResults");c.style.display="block";
+  if(!spots.length){c.innerHTML='<h3>📍 Planting Spots</h3><p style="color:#9ca3af;font-size:13px;margin-top:8px">No spots found. Try a larger radius.</p>';return}
+  var h='<h3>📍 '+spots.length+' Planting Spots Found</h3><div id="spotSummary">Ranked by suitability within '+searchRadius+' km</div>';
+  spots.forEach(function(s,i){
+    var v=AI.verdict(s.score);
+    var dist=s.distance<1?(s.distance*1000).toFixed(0)+"m":s.distance.toFixed(1)+"km";
+    h+='<div class="spot-card" data-i="'+i+'"><div class="spot-num">'+(i+1)+'</div><div class="spot-info"><div class="spot-name">'+s.icon+' '+(s.name||s.type+' near you')+'</div><div class="spot-meta"><span class="spot-type-tag">'+s.type+'</span>'+dist+'</div></div><div class="spot-score-wrap"><div class="spot-score" style="color:'+v.c+'">'+(s.score||"—")+'</div><div class="spot-score-label">/100</div></div></div>';
+  });
+  c.innerHTML=h;
+  c.querySelectorAll(".spot-card").forEach(function(card){
+    card.addEventListener("click",function(){
+      var i=Number(this.dataset.i);selectSpot(i);
+      c.querySelectorAll(".spot-card").forEach(function(x){x.classList.remove("active")});
+      this.classList.add("active");
+    });
+  });
+}
+
+// ===== MAP MARKERS =====
+function addMarkers(spots){
+  spots.forEach(function(s,i){
+    var v=AI.verdict(s.score);
+    var m=L.marker([s.lat,s.lng],{icon:L.divIcon({className:'',html:'<div style="background:'+v.c+';color:'+(s.score>=50?"#000":"#fff")+';width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)">'+(i+1)+'</div>',iconSize:[26,26],iconAnchor:[13,13]})}).addTo(map);
+    m.bindTooltip('<b>'+(s.name||s.type)+'</b><br>Score: '+(s.score||"N/A")+'/100');
+    m.on("click",function(){selectSpot(i)});
+    spotMarkers.push(m);
+  });
+}
+
+// ===== SELECT SPOT =====
+function selectSpot(i){
+  var s=foundSpots[i];if(!s)return;
+  map.flyTo([s.lat,s.lng],17,{duration:1});
+  var p=document.getElementById("spotDetail");p.style.display="block";
+  var v=AI.verdict(s.score);
+  var nc=nearestCity;
+  var t=pn(nc.temperature_C),r=pn(nc.rainfall),n=pn(nc.ndvi),tc=pn(nc.treecover),e=pn(nc.elevation),lc=pn(nc.landcover);
+  var cScore=AI.cs(t,r),vScore=AI.vs(n,tc),tScore=AI.ts(e,lc);
+  var zone=AI.zone(t,r),species=AI.species(t,r);
+  var nm=s.name||s.type+" near you";
+  var dist=s.distance<1?(s.distance*1000).toFixed(0)+"m":s.distance.toFixed(1)+"km";
+  var trees=s.type==="Park"?20:s.type==="Meadow"?30:s.type==="Grassland"?25:s.type==="Garden"?5:s.type==="Roadside"?3:10;
+  var survival=s.score>=75?85:s.score>=50?70:s.score>=25?50:30;
+  var water=r===null?"Unknown":r<400?"High — irrigation needed":r<800?"Moderate — seasonal watering":"Low — adequate rainfall";
+
+  p.innerHTML='<h2>🌱 Spot #'+(i+1)+' Analysis</h2>'+
+    '<div class="main-score"><div class="big-number" style="color:'+v.c+'">'+(s.score||"—")+'</div><div class="big-label">Planting Suitability</div><div class="verdict" style="background:'+v.c+'22;color:'+v.c+'">'+v.t+'</div></div>'+
+    '<div style="font-size:15px;font-weight:700;margin-bottom:2px">'+s.icon+' '+nm+'</div>'+
+    '<div style="font-size:12px;color:#6b7280;margin-bottom:12px"><span class="spot-type-tag">'+s.type+'</span>'+dist+' · '+zone+'</div>'+
+    sb("Climate Score",cScore)+sb("Vegetation Score",vScore)+sb("Terrain Score",tScore)+
+    '<div class="detail-grid">'+
+      di("🌡 Temperature",t!==null?t.toFixed(1)+"°C":"N/A")+di("🌧 Rainfall",r!==null?Math.round(r)+"mm/yr":"N/A")+
+      di("🌳 Tree Cover",tc!==null?tc.toFixed(0)+"%":"N/A")+di("⛰ Elevation",e!==null?Math.round(e)+"m":"N/A")+
+      di("🌲 Trees Plantable","~"+trees+" trees")+di("🎯 Survival Rate","~"+survival+"%")+
+      di("💧 Water Need",water)+di("🌍 CO₂/10yr","~"+(trees*22*10)+"kg")+
+    '</div>'+
+    '<div class="recommendation"><h3>🌱 Best Species</h3><div class="species-list">'+species.map(function(x){return'<span class="species-tag">'+x+'</span>'}).join("")+'</div></div>'+
+    '<div class="recommendation" style="margin-top:10px"><h3>📋 Planting Guide</h3><p>'+advice(s,t,r,species,zone,survival)+'</p></div>'+
+    '<a href="https://www.google.com/maps/dir/?api=1&origin='+userLat+','+userLng+'&destination='+s.lat+','+s.lng+'&travelmode=walking" target="_blank" class="directions-btn">🚶 Get Walking Directions</a>'+
+    '<a href="https://www.google.com/maps/dir/?api=1&origin='+userLat+','+userLng+'&destination='+s.lat+','+s.lng+'&travelmode=driving" target="_blank" class="directions-btn directions-btn--drive">🚗 Get Driving Directions</a>';
+  document.getElementById("sidebar").scrollTop=0;
+}
+
+function sb(l,s){var c=sc(s);return'<div class="score-row"><span class="score-label">'+l+'</span><span class="score-value" style="color:'+c+'">'+(s!==null?s:"—")+'</span></div><div class="score-bar"><div class="score-bar-fill" style="width:'+(s||0)+'%;background:'+c+'"></div></div>'}
+function di(l,v){return'<div class="detail-item"><div class="label">'+l+'</div><div class="value">'+v+'</div></div>'}
+
+function advice(s,t,r,sp,z,sv){
+  var a="This "+s.type.toLowerCase()+" is ";
+  a+=s.score>=75?"an excellent spot for planting. ":s.score>=50?"a good candidate with some prep needed. ":s.score>=25?"challenging but possible. ":"very difficult for trees. ";
+  if(s.type==="Park")a+="Parks have existing soil and often irrigation access. Check with local authorities. ";
+  else if(s.type==="Roadside")a+="Roadside trees reduce heat and pollution. Choose species tolerant of compact soil. ";
+  else if(s.type==="Vacant Land")a+="Test soil for contamination. Start with hardy pioneer species. ";
+  else if(s.type==="Meadow"||s.type==="Grassland")a+="Open land is ideal — plant in clusters of 5–10 trees for mutual protection. ";
+  a+="Best species: "+sp.slice(0,3).join(", ")+". Expected survival: ~"+sv+"%. ";
+  if(r!==null&&r<400)a+="Water regularly for 2 years — rainfall is insufficient.";
+  else if(r!==null&&r>=800)a+="Natural rainfall should sustain trees after the first season.";
+  return a;
+}
+
+// ===== HELPERS =====
+function haversineKm(a,b,c,d){var R=6371,p=Math.PI/180,dL=(c-a)*p,dN=(d-b)*p;var x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*p)*Math.cos(c*p)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+function findNearestCity(lat,lng){var b=null,bd=Infinity;for(var i=0;i<cities.length;i++){var c=cities[i],d=(lat-Number(c.lat))*(lat-Number(c.lat))+(lng-Number(c.lng))*(lng-Number(c.lng));if(d<bd){bd=d;b=c}}return b}
+
+})();
+</script>
+</body>
+</html>

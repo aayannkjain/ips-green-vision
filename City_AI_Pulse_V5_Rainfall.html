@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>City Pulse AI | IPS Green Vision</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:#050a12;color:white}
+#container{display:flex;width:100%;height:calc(100vh - 60px);margin-top:60px}
+
+/* SIDEBAR */
+#sidebar{width:360px;background:#0a0f1a;border-right:1px solid #1e293b;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+#sidebar::-webkit-scrollbar{width:4px}
+#sidebar::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}
+.side-header{padding:18px;border-bottom:1px solid #1e293b}
+.side-header h1{font-size:20px;font-weight:900;margin-bottom:4px}
+.side-header h1 span{color:#22c55e}
+.side-header p{color:#4b5563;font-size:11px;line-height:1.4}
+.search-row{padding:12px 18px;border-bottom:1px solid #1e293b}
+.search-row input{width:100%;padding:12px 16px;background:#111827;border:1px solid #1e293b;border-radius:10px;color:white;font-size:14px;outline:none;font-family:inherit}
+.search-row input:focus{border-color:#22c55e}
+#suggestions{background:#111827;border-radius:0 0 10px 10px;max-height:150px;overflow-y:auto;display:none}
+.sug-item{padding:10px 18px;cursor:pointer;font-size:13px;border-bottom:1px solid #1e293b}
+.sug-item:hover{background:#1a2332}
+
+/* CONTROLS */
+.ctrl-section{padding:12px 18px;border-bottom:1px solid #1e293b}
+.ctrl-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4b5563;margin-bottom:6px}
+.ctrl-section select{width:100%;padding:10px;background:#111827;border:1px solid #1e293b;border-radius:8px;color:white;font-size:13px;outline:none;font-family:inherit}
+.ctrl-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.ctrl-btn{padding:10px;border:1px solid #1e293b;border-radius:8px;background:#111827;color:#9ca3af;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;text-align:center}
+.ctrl-btn:hover{border-color:#22c55e;color:#22c55e}
+.ctrl-btn.primary{background:#22c55e22;color:#22c55e;border-color:#22c55e55}
+
+/* AI INSIGHT */
+.ai-card{margin:12px 18px;background:#0a1628;border:1px solid #1e3a5f;border-radius:14px;padding:16px;font-size:12px;color:#9ca3af;line-height:1.7}
+.ai-card h3{font-size:14px;font-weight:800;color:#22c55e;margin-bottom:8px}
+.ai-card strong{color:#d1d5db}
+.ai-card .g{color:#22c55e}.ai-card .r{color:#ef4444}.ai-card .y{color:#eab308}
+.alert-item{padding:6px 0;border-bottom:1px solid #1e293b;font-size:12px;color:#9ca3af}
+.alert-item:last-child{border-bottom:none}
+
+/* RIGHT SIDE */
+#right{flex:1;display:flex;flex-direction:column}
+
+/* METRICS BAR */
+.metrics{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;padding:10px;background:#0a0f1a;border-bottom:1px solid #1e293b}
+.metric{background:#111827;border-radius:10px;padding:10px 8px;text-align:center}
+.metric .m-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#4b5563}
+.metric .m-value{font-size:18px;font-weight:900;margin-top:4px;font-family:'Space Mono',monospace}
+.metric .m-note{font-size:9px;color:#374151;margin-top:2px}
+.metric .m-real{font-size:8px;color:#22c55e;font-weight:600}
+.metric .m-sim{font-size:8px;color:#f59e0b;font-weight:600}
+
+/* MAP */
+#map{flex:1}
+.map-controls{position:absolute;top:70px;right:12px;z-index:1000;display:flex;flex-direction:column;gap:4px}
+.map-btn{padding:8px 12px;background:rgba(10,15,26,0.9);border:1px solid #1e293b;border-radius:8px;color:#9ca3af;cursor:pointer;font-size:10px;font-weight:600;font-family:inherit;backdrop-filter:blur(8px)}
+.map-btn:hover{border-color:#22c55e;color:#22c55e}
+.map-btn.active{background:rgba(34,197,94,0.1);color:#22c55e;border-color:#22c55e55}
+
+/* HEALTH BADGE */
+.health-badge{position:absolute;top:70px;left:12px;z-index:1000;background:rgba(10,15,26,0.95);border:1px solid #1e293b;border-radius:14px;padding:16px;min-width:160px;backdrop-filter:blur(12px);text-align:center;display:none}
+.hb-score{font-size:42px;font-weight:900;font-family:'Space Mono',monospace}
+.hb-label{font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:1px}
+.hb-verdict{font-size:12px;font-weight:700;margin-top:4px}
+
+@media(max-width:768px){#sidebar{width:100%;max-height:40vh}#right{height:60vh}.metrics{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<div id="eco-navbar"></div>
+<div id="container">
+<div id="sidebar">
+  <div class="side-header">
+    <h1>🏙 City Pulse <span>AI</span></h1>
+    <p>Real satellite data + AI traffic simulation · Powered by Sentinel-5P, ERA5, CHIRPS, Hansen & OpenStreetMap</p>
+  </div>
+  <div class="search-row">
+    <input type="text" id="searchInput" placeholder="Search any city..."/>
+    <div id="suggestions"></div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-label">🗺 Map Layer</div>
+    <select id="layerSelect">
+      <option value="satellite">🛰 Satellite</option>
+      <option value="traffic">🚗 Traffic (Google)</option>
+      <option value="dark">🌑 Dark</option>
+      <option value="terrain">⛰ Terrain</option>
+    </select>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-label">🚦 Traffic Signal Mode</div>
+    <select id="signalMode">
+      <option value="normal">Normal Flow</option>
+      <option value="peak">Peak Hour</option>
+      <option value="emergency">Emergency Corridor</option>
+      <option value="eco">Eco Timing</option>
+    </select>
+    <div class="ctrl-row">
+      <button class="ctrl-btn primary" id="optimizeBtn">⚡ Optimize Signals</button>
+      <button class="ctrl-btn" id="emergencyBtn">🚨 Emergency Mode</button>
+    </div>
+  </div>
+
+  <div class="ai-card" id="aiCard">
+    <h3>🤖 City Intelligence</h3>
+    <p>Search a city to see its environmental health, real satellite data, and AI analysis.</p>
+  </div>
+
+  <div class="ai-card">
+    <h3>⚠ Priority Alerts</h3>
+    <div id="alertList"><div class="alert-item">Waiting for city selection...</div></div>
+  </div>
+
+  <div class="ai-card">
+    <h3>📊 Data Sources</h3>
+    <p>
+      🌫 Air Quality: <strong class="g">Real</strong> — Sentinel-5P (NO₂, CO, SO₂)<br>
+      🌧 Rainfall: <strong class="g">Real</strong> — CHIRPS Satellite<br>
+      🌡 Temperature: <strong class="g">Real</strong> — ERA5 Reanalysis<br>
+      🌳 Tree Cover: <strong class="g">Real</strong> — Hansen/GEE<br>
+      🌿 NDVI: <strong class="g">Real</strong> — MODIS<br>
+      🚗 Traffic: <strong class="y">Simulated</strong> — AI model<br>
+      ⚡ Energy: <strong class="y">Simulated</strong> — AI model<br>
+      🏥 Services: <strong class="y">Estimated</strong> — population model
+    </p>
+  </div>
+</div>
+
+<div id="right">
+  <div class="metrics" id="metricsBar"></div>
+  <div id="map" style="position:relative">
+    <div class="health-badge" id="healthBadge"></div>
+  </div>
+</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="navbarsdg.js"></script>
+<script>
+// Tile layers
+var darkTile=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19});
+var satTile=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+var terrainTile=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17});
+var trafficTile=L.tileLayer('https://mt1.google.com/vt/lyrs=m@221097413,traffic&x={x}&y={y}&z={z}',{maxZoom:19});
+
+var map=L.map('map',{zoomControl:true}).setView([20,78],5);
+satTile.addTo(map);
+setTimeout(function(){map.invalidateSize()},200);
+
+// Layer switching
+document.getElementById('layerSelect').addEventListener('change',function(){
+  map.eachLayer(function(l){if(l._url)map.removeLayer(l)});
+  var v=this.value;
+  if(v==='traffic')trafficTile.addTo(map);
+  else if(v==='dark')darkTile.addTo(map);
+  else if(v==='terrain')terrainTile.addTo(map);
+  else satTile.addTo(map);
+});
+
+var cities=[],currentCity=null,cityMarkers=[],signalMode='normal';
+function byPop(a,b){return (Number(b.population)||0)-(Number(a.population)||0)}
+function pn(v){if(v===""||v===undefined||v===null)return null;var n=Number(v);return isNaN(n)?null:n}
+
+// Load real data
+fetch("eco_data.json").then(function(r){return r.json()}).then(function(data){
+  cities=data;
+  document.getElementById("searchInput").placeholder="Search "+cities.length.toLocaleString()+" cities...";
+}).catch(function(){});
+
+// Search
+var searchInput=document.getElementById("searchInput");
+var suggestions=document.getElementById("suggestions");
+searchInput.addEventListener("input",function(){
+  var q=searchInput.value.toLowerCase();if(q.length<2){suggestions.style.display="none";return}
+  var m=cities.filter(function(c){return(c.city_ascii||c.city||"").toLowerCase().includes(q)}).sort(byPop).slice(0,6);
+  suggestions.innerHTML="";m.forEach(function(c){
+    var d=document.createElement("div");d.className="sug-item";
+    d.textContent=(c.city_ascii||c.city)+", "+c.country;
+    d.addEventListener("click",function(){searchInput.value=c.city_ascii||c.city;suggestions.style.display="none";loadCity(c)});
+    suggestions.appendChild(d);
+  });suggestions.style.display=m.length?"block":"none";
+});
+searchInput.addEventListener("keydown",function(e){
+  if(e.key==="Enter"){
+    var q=searchInput.value.toLowerCase().trim();
+    var ex=cities.filter(function(c){return(c.city_ascii||c.city||"").toLowerCase()===q}).sort(byPop);var c=ex[0]||cities.filter(function(c){return(c.city_ascii||c.city||"").toLowerCase().startsWith(q)}).sort(byPop)[0];
+    if(c){suggestions.style.display="none";loadCity(c)}
+  }
+});
+
+function loadCity(c){
+  currentCity=c;
+  var nm=c.city_ascii||c.city;
+  var lat=Number(c.lat),lng=Number(c.lng);
+  map.flyTo([lat,lng],12,{duration:1.5});
+
+  // Clear old markers
+  cityMarkers.forEach(function(m){map.removeLayer(m)});cityMarkers=[];
+
+  // Center marker
+  var mk=L.circleMarker([lat,lng],{radius:14,color:'#22c55e',weight:3,fillColor:'#22c55e',fillOpacity:0.15}).addTo(map);
+  mk.bindTooltip('<strong>'+nm+'</strong>',{permanent:true,direction:'top',className:'leaflet-tooltip'});
+  cityMarkers.push(mk);
+
+  // Real data
+  var tc=pn(c.treecover),ndvi=pn(c.ndvi);
+  var temp=pn(c.temperature_C),rain=pn(c.rainfall);
+  var no2=pn(c.no2),co=pn(c.co),so2=pn(c.so2),aer=pn(c.aerosol);
+  var pop=pn(c.population)||0;
+  var elev=pn(c.elevation);
+
+  // Real AQI score from satellite
+  var aqiScore=null;
+  if(no2!==null){aqiScore=no2<30?'Good':no2<60?'Moderate':no2<100?'Unhealthy':'Hazardous'}
+
+  // Simulated metrics (like friend's code)
+  var seed=Math.abs(Math.sin(lat*12.9898+lng*78.233));
+  var popScore=Math.min(100,Math.max(10,Math.log10(Math.max(pop,100000))*18-70));
+  var traffic=Math.round(Math.max(35,Math.min(96,48+popScore*0.34+seed*26)));
+  var energy=Math.round(Math.max(30,Math.min(96,42+popScore*0.32+seed*28)));
+  var services=Math.round(Math.max(52,Math.min(96,92-popScore*0.12+seed*14)));
+
+  if(signalMode==='peak')traffic=Math.min(96,traffic+5);
+  if(signalMode==='emergency')traffic=Math.min(96,traffic+10);
+  if(signalMode==='eco')traffic=Math.max(35,traffic-3);
+
+  // Health score — mix real + simulated
+  var scores=[];
+  if(tc!==null)scores.push(tc>40?90:tc>25?75:tc>15?55:tc>5?35:15);
+  if(no2!==null)scores.push(no2<30?90:no2<60?70:no2<100?45:20);
+  if(temp!==null)scores.push(temp>=15&&temp<=25?90:temp>=10&&temp<=30?75:temp>=5&&temp<=35?55:35);
+  if(rain!==null)scores.push(rain>1200?90:rain>800?78:rain>500?65:rain>250?45:25);
+  scores.push(Math.round(100-traffic*0.6));
+  scores.push(Math.round(100-energy*0.5));
+  var healthScore=scores.length?Math.round(scores.reduce(function(a,b){return a+b},0)/scores.length):50;
+
+  // Metrics bar
+  var metricsHtml=
+    metricBox('🌳','Tree Cover',tc!==null?tc+'%':'—',tc!==null?(tc>25?'#22c55e':'#ef4444'):'#4b5563','Hansen GEE','real')+
+    metricBox('🌫','Air Quality',aqiScore||'—',no2!==null?(no2<60?'#22c55e':no2<100?'#eab308':'#ef4444'):'#4b5563','Sentinel-5P','real')+
+    metricBox('🌡','Temperature',temp!==null?temp.toFixed(1)+'°C':'—',temp!==null?(temp>35?'#ef4444':temp>28?'#eab308':'#22c55e'):'#4b5563','ERA5','real')+
+    metricBox('🌧','Rainfall',rain!==null?Math.round(rain)+'mm':'—',rain!==null?(rain>800?'#22c55e':rain>400?'#eab308':'#ef4444'):'#4b5563','CHIRPS','real')+
+    metricBox('🚗','Traffic',traffic+'%',traffic>80?'#ef4444':traffic>65?'#eab308':'#22c55e','AI Model','sim')+
+    metricBox('⚡','Energy',energy+'%',energy>78?'#ef4444':energy>60?'#eab308':'#22c55e','AI Model','sim')+
+    metricBox('🏥','Services',services+'%',services>80?'#22c55e':'#eab308','Population','sim')+
+    metricBox('👥','Population',pop>10000000?(pop/10000000).toFixed(1)+'Cr':pop>100000?(pop/100000).toFixed(1)+'L':pop.toLocaleString(),'#3b82f6','WorldCities','real');
+  document.getElementById('metricsBar').innerHTML=metricsHtml;
+
+  // Health badge
+  var hb=document.getElementById('healthBadge');
+  var hCol=healthScore>=75?'#22c55e':healthScore>=50?'#eab308':'#ef4444';
+  var hVerdict=healthScore>=80?'Thriving':healthScore>=65?'Healthy':healthScore>=50?'Moderate':healthScore>=35?'Stressed':'Critical';
+  hb.innerHTML='<div class="hb-score" style="color:'+hCol+'">'+healthScore+'</div><div class="hb-label">City Health</div><div class="hb-verdict" style="color:'+hCol+'">'+hVerdict+'</div>';
+  hb.style.display='block';
+
+  // AI Card
+  var aiHtml='<h3>🤖 '+nm+' Intelligence</h3>';
+  aiHtml+='<p>';
+  if(tc!==null)aiHtml+='🌳 Tree cover is <strong class="'+(tc>25?'g':tc>10?'y':'r')+'">'+Math.round(tc)+'%</strong>'+(tc<15?' — needs urban forestry':'')+'<br>';
+  if(no2!==null)aiHtml+='🌫 NO₂: <strong class="'+(no2<60?'g':no2<100?'y':'r')+'">'+no2.toFixed(1)+' µmol/m²</strong> (Sentinel-5P satellite)<br>';
+  if(co!==null)aiHtml+='💨 CO: <strong>'+Math.round(co)+' ppb</strong><br>';
+  if(temp!==null)aiHtml+='🌡 Temperature: <strong class="'+(temp>35?'r':temp>28?'y':'g')+'">'+temp.toFixed(1)+'°C</strong> (ERA5)<br>';
+  if(rain!==null)aiHtml+='🌧 Rainfall: <strong class="'+(rain>800?'g':rain>400?'y':'r')+'">'+Math.round(rain)+'mm/year</strong> (CHIRPS)<br>';
+  if(ndvi!==null)aiHtml+='🌿 NDVI: <strong class="'+(ndvi>0.3?'g':ndvi>0.15?'y':'r')+'">'+ndvi.toFixed(3)+'</strong> (MODIS)<br>';
+  aiHtml+='🚗 Traffic congestion: <strong class="'+(traffic>80?'r':traffic>65?'y':'g')+'">'+traffic+'%</strong> (AI simulated)<br>';
+  aiHtml+='⚡ Energy load: <strong>'+energy+'%</strong><br>';
+  if(temp!==null&&tc!==null&&temp>30&&tc<20)aiHtml+='<br>🔥 <strong class="r">Urban Heat Island Risk</strong> — high temp + low tree cover<br>';
+  if(no2!==null&&no2>80)aiHtml+='<br>⚠ <strong class="r">Air quality advisory</strong> for sensitive groups<br>';
+  aiHtml+='</p>';
+  document.getElementById('aiCard').innerHTML=aiHtml;
+
+  // Alerts
+  var alerts=[];
+  if(no2!==null&&no2>80)alerts.push('🌫 Air pollution high — NO₂ at '+no2.toFixed(1));
+  else if(no2!==null)alerts.push('✅ Air quality within safe range');
+  if(tc!==null&&tc<10)alerts.push('🌳 Critical tree cover — only '+Math.round(tc)+'%');
+  else if(tc!==null&&tc>30)alerts.push('✅ Good green cover at '+Math.round(tc)+'%');
+  if(traffic>80)alerts.push('🚗 Traffic congestion high — '+traffic+'%');
+  else alerts.push('✅ Traffic flow manageable');
+  if(temp!==null&&temp>35)alerts.push('🔥 Extreme heat warning — '+temp.toFixed(1)+'°C');
+  if(rain!==null&&rain<300)alerts.push('💧 Water stress — low rainfall');
+  if(pop>10000000)alerts.push('👥 Megacity — prioritize transit & emergency');
+  document.getElementById('alertList').innerHTML=alerts.map(function(a){return'<div class="alert-item">'+a+'</div>'}).join('');
+
+  // Draw zones on map
+  drawZones(lat,lng,pop,tc,no2,traffic,energy,rain);
+}
+
+function metricBox(icon,label,value,col,source,type){
+  return'<div class="metric"><div class="m-label">'+icon+' '+label+'</div><div class="m-value" style="color:'+col+'">'+value+'</div><div class="m-'+(type==='real'?'real':'sim')+'">'+(type==='real'?'✓ Real':'~ Simulated')+'</div><div class="m-note">'+source+'</div></div>';
+}
+
+function drawZones(lat,lng,pop,tc,no2,traffic,energy,rain){
+  var scale=pop>10000000?0.08:pop>1000000?0.05:0.03;
+  var zones=[
+    {name:'Traffic Control',lat:lat+scale,lng:lng+scale*0.8,col:'#22c55e',radius:500+traffic*12},
+    {name:'Air Quality',lat:lat+scale*0.6,lng:lng-scale,col:'#3b82f6',radius:520+(no2||50)*9},
+    {name:'Green Cover',lat:lat-scale,lng:lng+scale*1.2,col:'#15803d',radius:400+(tc||20)*15},
+    {name:'Energy Grid',lat:lat-scale*0.7,lng:lng-scale*0.8,col:'#f59e0b',radius:500+energy*10},
+  ];
+  zones.forEach(function(z){
+    var circle=L.circle([z.lat,z.lng],{radius:z.radius,color:z.col,fillColor:z.col,fillOpacity:0.12,weight:2}).addTo(map);
+    circle.bindTooltip(z.name);
+    cityMarkers.push(circle);
+    var dot=L.circleMarker([z.lat,z.lng],{radius:6,color:'#fff',weight:2,fillColor:z.col,fillOpacity:1}).addTo(map);
+    cityMarkers.push(dot);
+  });
+
+  // Traffic corridors
+  var corridors=[
+    [[lat+scale,lng-scale],[lat,lng],[lat-scale,lng+scale]],
+    [[lat-scale*0.7,lng-scale*1.2],[lat,lng],[lat+scale*0.9,lng+scale*1.1]]
+  ];
+  corridors.forEach(function(c,i){
+    var em=signalMode==='emergency'&&i===0;
+    var line=L.polyline(c,{color:em?'#ef4444':'#22c55e',weight:em?6:3,opacity:0.6,dashArray:signalMode==='peak'?'4 8':'10 8'}).addTo(map);
+    line.bindTooltip('Traffic Corridor '+(i+1)+' · '+signalMode);
+    cityMarkers.push(line);
+  });
+}
+
+// Signal mode
+document.getElementById('signalMode').addEventListener('change',function(){
+  signalMode=this.value;
+  if(currentCity)loadCity(currentCity);
+});
+document.getElementById('optimizeBtn').addEventListener('click',function(){
+  signalMode='eco';
+  document.getElementById('signalMode').value='eco';
+  if(currentCity)loadCity(currentCity);
+});
+document.getElementById('emergencyBtn').addEventListener('click',function(){
+  signalMode='emergency';
+  document.getElementById('signalMode').value='emergency';
+  if(currentCity)loadCity(currentCity);
+});
+
+// URL param
+var params=new URLSearchParams(window.location.search);
+var autoCity=params.get("city");
+if(autoCity){
+  var checkData=setInterval(function(){
+    if(cities.length){
+      clearInterval(checkData);searchInput.value=autoCity;
+      var c=cities.find(function(c){return(c.city_ascii||c.city||"").toLowerCase()===autoCity.toLowerCase()});
+      if(c)loadCity(c);
+    }
+  },200);
+}
+</script>
+</body>
+</html>
