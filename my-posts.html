@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Home | IPS Green Vision</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--green:#16a34a;--green-dark:#15803d;--green-light:#dcfce7;--text:#1a2e1a;--muted:#55705a;--line:#d8e8da;--bg:#f7faf7;--red:#dc2626}
+  body{min-height:100vh;padding-top:60px;background:var(--bg);color:var(--text);font-family:"DM Sans",sans-serif}
+  h1,h2,h3{font-family:Outfit,sans-serif;letter-spacing:-.02em}
+  main{width:min(980px,calc(100% - 32px));margin:0 auto;padding:32px 0 70px}
+  .hello{padding:30px;border-radius:20px;background:linear-gradient(135deg,#102a18,#14532d 55%,#15803d);color:#fff;margin-bottom:22px}
+  .hello h1{font-size:clamp(26px,4vw,34px)}
+  .hello p{margin-top:8px;color:#d8f3df;line-height:1.6}
+  .choices{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
+  .choice{display:flex;align-items:center;gap:14px;padding:20px;border:2px solid var(--line);border-radius:16px;background:#fff;color:var(--text);text-decoration:none;font:inherit;text-align:left;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+  .choice:hover{border-color:#86efac;box-shadow:0 6px 20px rgba(22,163,74,.08)}
+  .choice.is-active{border-color:var(--green);background:#f0fdf4}
+  .choice .ico{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;background:var(--green-light);font-size:24px;flex:0 0 auto}
+  .choice strong{display:block;font-family:Outfit,sans-serif;font-size:19px}
+  .choice small{color:var(--muted);font-size:13px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:18px;padding:26px;box-shadow:0 6px 24px rgba(15,49,22,.04)}
+  .panel h2{font-size:23px;margin-bottom:4px}
+  .panel .sub{color:var(--muted);font-size:14px;margin-bottom:18px}
+  label{display:block;font-size:13px;font-weight:700;color:#36563e;margin:18px 0 7px}
+  .req{color:var(--red)}
+  input[type=file]{display:block;width:100%;padding:12px;border:2px dashed var(--line);border-radius:12px;background:var(--bg);font:inherit;cursor:pointer}
+  textarea,select{width:100%;padding:12px 14px;border:1px solid #dce7de;border-radius:10px;background:#f8fbf8;color:var(--text);font:15px/1.6 "DM Sans",sans-serif;outline:none}
+  textarea{resize:vertical;min-height:120px}
+  textarea:focus,select:focus{background:#fff;border-color:#22c55e;box-shadow:0 0 0 3px #22c55e15}
+  [aria-invalid=true]{border-color:var(--red)!important;background:#fff7f7!important}
+  .field-error{color:var(--red);font-size:12px;margin-top:5px}.field-error:empty{display:none}
+  .hint{color:#7a8e7e;font-size:12px;margin-top:6px}
+  .counter{text-align:right;color:#7a8e7e;font-size:12px;margin-top:5px}.counter.full{color:var(--red);font-weight:700}
+  .preview{display:none;margin-top:12px;max-width:100%;max-height:260px;border-radius:12px;object-fit:contain;background:#eef5ef}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 22px;border:0;border-radius:10px;background:var(--green);color:#fff;font:700 15px "DM Sans",sans-serif;cursor:pointer;text-decoration:none}
+  .btn:hover{background:var(--green-dark)}.btn:disabled{opacity:.6;cursor:wait}
+  .btn.light{background:var(--green-light);color:var(--green-dark)}
+  .btn.danger{background:var(--red)}.btn.danger:hover{background:#b91c1c}
+  .btn.plain{background:transparent;color:var(--muted)}.btn.plain:hover{background:#eef5ef}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+  .form-error{margin-top:14px;padding:10px 12px;border-radius:8px;background:#fff1f2;color:#b91c1c;font-size:13px}.form-error:empty{display:none}
+  .toast{position:fixed;left:50%;top:76px;transform:translateX(-50%);z-index:100000;display:none;max-width:calc(100% - 32px);padding:13px 20px;border-radius:12px;background:#14532d;color:#fff;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+  .toast.show{display:block}
+  .post-row{display:grid;grid-template-columns:150px 1fr;gap:18px;padding:16px 0;border-top:1px solid #edf4ee}
+  .post-row:first-child{border-top:0}
+  .post-row img{width:150px;height:112px;object-fit:cover;border-radius:12px;background:#eef5ef}
+  .goal-badge{display:inline-block;padding:3px 10px;border-radius:7px;font-size:12px;font-weight:700;color:#fff;margin-bottom:6px}
+  .post-desc{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-size:15px}
+  .post-meta{color:#7a8e7e;font-size:12px;margin-top:6px}
+  .row-links{display:flex;gap:16px;margin-top:10px}
+  .link{border:0;background:none;padding:0;font:700 14px "DM Sans",sans-serif;cursor:pointer;color:var(--green-dark)}
+  .link:hover{text-decoration:underline}.link.del{color:var(--red)}
+  .empty{text-align:center;padding:36px 16px;color:var(--muted)}
+  .empty .big{font-size:38px;margin-bottom:8px}
+  dialog{margin:auto;width:min(560px,calc(100% - 28px));max-height:calc(100dvh - 40px);border:1px solid #e2ece3;border-radius:20px;padding:26px;box-shadow:0 24px 90px #052e1638;color:var(--text);font-family:"DM Sans",sans-serif}
+  dialog::backdrop{background:rgba(10,30,17,.48);backdrop-filter:blur(4px)}
+  dialog h2{font-size:22px;margin-bottom:6px}
+  .confirm{width:min(420px,calc(100% - 28px));text-align:center}
+  .confirm p{color:var(--muted);line-height:1.6;margin-top:6px}
+  .confirm .actions{justify-content:center}
+  .gate{text-align:center;padding:46px 20px}
+  .gate p{color:var(--muted);margin:10px 0 20px;line-height:1.6}
+  footer{padding:24px;text-align:center;border-top:1px solid var(--line);background:#fff;color:#78907b;font-size:13px}
+  @media(max-width:640px){.choices{grid-template-columns:1fr}.post-row{grid-template-columns:1fr}.post-row img{width:100%;height:200px}.panel{padding:20px}}
+</style>
+</head>
+<body>
+<div id="eco-navbar"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<main id="app">
+  <div class="panel gate" id="loading"><p>Loading…</p></div>
+</main>
+
+<!-- Edit post popup -->
+<dialog id="editDialog" aria-labelledby="editTitle">
+  <h2 id="editTitle">✏️ Edit post</h2>
+  <form id="editForm" novalidate>
+    <label for="editImage">Change image <span class="hint">(optional, max 2 MB after shrinking)</span></label>
+    <input type="file" id="editImage" accept="image/*">
+    <p class="field-error" id="editImage-err"></p>
+    <img class="preview" id="editPreview" alt="Post image">
+    <label for="editDesc">Description <span class="req">*</span></label>
+    <textarea id="editDesc" maxlength="500" placeholder="Describe what you did for this goal"></textarea>
+    <div class="counter" id="editCounter">0 / 500</div>
+    <p class="field-error" id="editDesc-err"></p>
+    <label for="editGoal">Goal <span class="req">*</span></label>
+    <select id="editGoal"></select>
+    <p class="field-error" id="editGoal-err"></p>
+    <p class="form-error" id="editError" role="alert"></p>
+    <div class="actions">
+      <button class="btn" type="submit" id="editSave">💾 Save changes</button>
+      <button class="btn plain" type="button" id="editCancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Yes / No confirmation popup -->
+<dialog id="confirmDialog" class="confirm" aria-labelledby="confirmTitle">
+  <div style="font-size:40px" id="confirmIcon">❓</div>
+  <h2 id="confirmTitle"></h2>
+  <p id="confirmText"></p>
+  <div class="actions">
+    <button class="btn" type="button" id="confirmYes">Yes</button>
+    <button class="btn plain" type="button" id="confirmNo">No, cancel</button>
+  </div>
+</dialog>
+
+<footer>© 2026 IPS Green Vision · Created by Aayann K Jain · Indirapuram Public School</footer>
+
+<script src="navbarsdg.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- The 17 goals ----------
+  var GOALS = [
+    [1, "No Poverty", "#E5243B"], [2, "Zero Hunger", "#DDA63A"], [3, "Good Health and Well-being", "#4C9F38"],
+    [4, "Quality Education", "#C5192D"], [5, "Gender Equality", "#FF3A21"], [6, "Clean Water and Sanitation", "#26BDE2"],
+    [7, "Affordable and Clean Energy", "#FCC30B"], [8, "Decent Work and Economic Growth", "#A21942"],
+    [9, "Industry, Innovation and Infrastructure", "#FD6925"], [10, "Reduced Inequalities", "#DD1367"],
+    [11, "Sustainable Cities and Communities", "#FD9D24"], [12, "Responsible Consumption and Production", "#BF8B2E"],
+    [13, "Climate Action", "#3F7E44"], [14, "Life Below Water", "#0A97D9"], [15, "Life on Land", "#56C02B"],
+    [16, "Peace, Justice and Strong Institutions", "#00689D"], [17, "Partnerships for the Goals", "#19486A"]
+  ];
+  function goal(id) { return GOALS.filter(function (g) { return g[0] === Number(id); })[0]; }
+  function goalOptions() {
+    return '<option value="">Choose a goal…</option>' + GOALS.map(function (g) { return '<option value="' + g[0] + '">SDG ' + g[0] + ' – ' + g[1] + '</option>'; }).join('');
+  }
+
+  var MAX_BYTES = 2 * 1024 * 1024;   // 2 MB
+  var MAX_CHARS = 500;
+  var BUCKET = 'post-images';
+  var params = new URLSearchParams(location.search);
+  var app = document.getElementById('app');
+  var sb = null, me = null;
+
+  // ---------- Small helpers ----------
+  function $(id) { return document.getElementById(id); }
+  var toastTimer;
+  function toast(text) {
+    var t = $('toast'); t.textContent = text; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('show'); }, 3500);
+  }
+  function setErr(id, msg) {
+    $(id + '-err').textContent = msg || '';
+    if (msg) $(id).setAttribute('aria-invalid', 'true'); else $(id).removeAttribute('aria-invalid');
+    return msg;
+  }
+  function when(iso) { return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+  function imageUrl(path) { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; }
+  function friendly(err) {
+    var m = (err && err.message) || String(err);
+    if (/Failed to fetch|NetworkError/i.test(m)) return 'Could not reach the server. Check your internet connection.';
+    if (/exceeded the maximum allowed size|too large/i.test(m)) return 'The image is larger than 2 MB.';
+    if (/row-level security|JWT|not authenticated/i.test(m)) return 'Your login has expired. Please log in again.';
+    return m;
+  }
+
+  // Yes / No popup. Returns a Promise<boolean>.
+  function confirmBox(opts) {
+    return new Promise(function (resolve) {
+      var d = $('confirmDialog');
+      $('confirmIcon').textContent = opts.icon || '❓';
+      $('confirmTitle').textContent = opts.title;
+      $('confirmText').textContent = opts.text || '';
+      $('confirmYes').textContent = opts.yes || 'Yes';
+      $('confirmYes').className = 'btn' + (opts.danger ? ' danger' : '');
+      function done(v) { d.close(); resolve(v); }
+      $('confirmYes').onclick = function () { done(true); };
+      $('confirmNo').onclick = function () { done(false); };
+      d.oncancel = function (e) { e.preventDefault(); done(false); };
+      d.showModal();
+      $('confirmNo').focus();
+    });
+  }
+
+  // ---------- Shrink a photo to JPEG under 2 MB ----------
+  // Big phone photos are resized (longest side 1600px) and compressed until they fit.
+  // Re-saving also removes hidden location (GPS) data from the photo.
+  function loadImage(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('This picture format is not supported. Please use a JPG or PNG photo.')); };
+      img.src = url;
+    });
+  }
+  function toBlob(canvas, quality) { return new Promise(function (r) { canvas.toBlob(r, 'image/jpeg', quality); }); }
+  function shrinkImage(file) {
+    if (!file || !/^image\//.test(file.type)) return Promise.reject(new Error('Please choose an image file (JPG, PNG or WEBP).'));
+    return loadImage(file).then(function (img) {
+      var side = 1600, quality = 0.85, tries = 0;
+      function attempt() {
+        var scale = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.naturalWidth * scale)); c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        var ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+        return toBlob(c, quality).then(function (blob) {
+          if (blob && blob.size <= MAX_BYTES) return blob;
+          if (++tries >= 8) throw new Error('This image is too large even after shrinking (max 2 MB). Please choose another photo.');
+          if (quality > 0.55) quality -= 0.1; else { side = Math.round(side * 0.8); quality = 0.8; }
+          return attempt();
+        });
+      }
+      return attempt();
+    });
+  }
+
+  function upload(blob) {
+    var path = me.id + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+    return sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false }).then(function (r) {
+      if (r.error) throw r.error; return path;
+    });
+  }
+  function removeImage(path) { return sb.storage.from(BUCKET).remove([path]).catch(function () {}); }
+
+  // ---------- Page states ----------
+  function gate(icon, title, text, buttons) {
+    app.innerHTML = '<div class="panel gate"><div style="font-size:44px">' + icon + '</div><h2></h2><p></p><div class="actions" style="justify-content:center"></div></div>';
+    app.querySelector('h2').textContent = title; app.querySelector('p').textContent = text;
+    var box = app.querySelector('.actions');
+    buttons.forEach(function (b) {
+      var el = document.createElement('button'); el.className = 'btn' + (b.light ? ' light' : ''); el.textContent = b.label; el.onclick = b.onClick; box.appendChild(el);
+    });
+  }
+
+  // My Home: welcome + this student's own posts (view / edit / delete)
+  function render() {
+    app.innerHTML =
+      '<section class="hello"><h1></h1><p>Here are your posts. To add a new post, open <strong>SDGs</strong>, choose a goal and click “➕ Add a post for this goal”.</p>' +
+      '<div class="actions" style="margin-top:16px"><a class="btn light" href="index.html">🌍 Add a post from SDGs</a><a class="btn light" href="index.html?view=community">👥 See all posts in Community</a></div></section>' +
+      '<div id="tabArea"></div>';
+    app.querySelector('h1').textContent = '👋 Welcome, ' + me.firstName + ' ' + me.lastName;
+    renderView();
+  }
+
+  function descError(text) {
+    if (!text) return 'Please describe what you did for this goal.';
+    if (text.length > MAX_CHARS) return 'Description must be 500 characters or fewer.';
+    return '';
+  }
+  function wireCounter(boxId, counterId) {
+    var box = $(boxId), counter = $(counterId);
+    function update() {
+      counter.textContent = box.value.length + ' / ' + MAX_CHARS;
+      counter.classList.toggle('full', box.value.length >= MAX_CHARS);
+      if (box.getAttribute('aria-invalid')) setErr(boxId, descError(box.value.trim()));
+    }
+    box.addEventListener('input', update); update();
+  }
+
+  // ---------- VIEW / UPDATE POSTS ----------
+  function renderView() {
+    var area = $('tabArea');
+    area.innerHTML = '<section class="panel"><h2>🗂️ Your Posts</h2><p class="sub">Your posts are shown in Community with your first and last name. Only you can edit or delete them.</p><div id="postList"><p class="empty">Loading your posts…</p></div></section>';
+    sb.from('post').select('*').eq('userId', me.id).order('createdAt', { ascending: false }).then(function (r) {
+      if (r.error) throw r.error;
+      var posts = r.data || [];
+      var list = $('postList');
+      if (!posts.length) {
+        list.innerHTML = '<div class="empty"><div class="big">🌱</div><p>You have not posted anything yet.</p><div class="actions" style="justify-content:center"><a class="btn" href="index.html">🌍 Go to SDGs to add your first post</a></div></div>';
+        return;
+      }
+      var ids = posts.map(function (p) { return p.id; });
+      return Promise.all([
+        sb.from('post_like').select('postId').in('postId', ids),
+        sb.from('post_comment').select('postId').in('postId', ids)
+      ]).then(function (res) {
+        var likes = {}, comments = {};
+        (res[0].data || []).forEach(function (x) { likes[x.postId] = (likes[x.postId] || 0) + 1; });
+        (res[1].data || []).forEach(function (x) { comments[x.postId] = (comments[x.postId] || 0) + 1; });
+        list.innerHTML = '';
+        posts.forEach(function (p) { list.appendChild(postRow(p, likes[p.id] || 0, comments[p.id] || 0)); });
+      });
+    }).catch(function (err) { $('postList').innerHTML = '<p class="form-error"></p>'; $('postList').firstChild.textContent = friendly(err); });
+  }
+
+  function postRow(p, likeCount, commentCount) {
+    var g = goal(p.goalId);
+    var row = document.createElement('article'); row.className = 'post-row';
+    row.innerHTML = '<img alt=""><div><span class="goal-badge"></span><p class="post-desc"></p><p class="post-meta"></p>' +
+      '<div class="row-links"><button type="button" class="link edit">✏️ Edit</button><button type="button" class="link del">🗑️ Delete</button></div></div>';
+    row.querySelector('img').src = imageUrl(p.imagePath);
+    row.querySelector('img').alt = 'Your post for SDG ' + p.goalId;
+    var badge = row.querySelector('.goal-badge'); badge.textContent = 'SDG ' + g[0] + ' · ' + g[1]; badge.style.background = g[2];
+    row.querySelector('.post-desc').textContent = p.description;
+    row.querySelector('.post-meta').textContent = 'Posted ' + when(p.createdAt) + (p.updatedAt ? ' · Updated ' + when(p.updatedAt) : '') + ' · ♥ ' + likeCount + ' · 💬 ' + commentCount;
+    row.querySelector('.edit').onclick = function () { openEdit(p); };
+    row.querySelector('.del').onclick = function () { deletePost(p); };
+    return row;
+  }
+
+  // ---------- DELETE ----------
+  function deletePost(p) {
+    confirmBox({ icon: '🗑️', title: 'Delete this post?', text: 'The photo, description, likes and comments will be removed. This cannot be undone.', yes: 'Yes, delete', danger: true })
+      .then(function (ok) {
+        if (!ok) return;
+        return sb.from('post').delete().eq('id', p.id).then(function (r) {
+          if (r.error) throw r.error;
+          removeImage(p.imagePath);
+          renderView(); toast('🗑️ Your post has been deleted.');
+        });
+      }).catch(function (err) { toast('⚠️ ' + friendly(err)); });
+  }
+
+  // ---------- EDIT ----------
+  var editing = null, editBlob = null;
+  $('editGoal').innerHTML = goalOptions();
+  wireCounter('editDesc', 'editCounter');
+  function openEdit(p) {
+    editing = p; editBlob = null;
+    $('editImage').value = ''; setErr('editImage', ''); setErr('editDesc', ''); setErr('editGoal', ''); $('editError').textContent = '';
+    $('editPreview').src = imageUrl(p.imagePath); $('editPreview').style.display = 'block';
+    $('editDesc').value = p.description; $('editDesc').dispatchEvent(new Event('input'));
+    $('editGoal').value = String(p.goalId);
+    $('editSave').disabled = false; $('editSave').textContent = '💾 Save changes';
+    $('editDialog').showModal();
+  }
+  $('editCancel').onclick = function () { $('editDialog').close(); };
+  $('editImage').onchange = function () {
+    editBlob = null; setErr('editImage', '');
+    var f = this.files[0]; if (!f) { $('editPreview').src = imageUrl(editing.imagePath); return; }
+    $('editSave').disabled = true;
+    shrinkImage(f).then(function (b) { editBlob = b; $('editPreview').src = URL.createObjectURL(b); })
+      .catch(function (e) { setErr('editImage', e.message); $('editImage').value = ''; })
+      .then(function () { $('editSave').disabled = false; });
+  };
+  $('editForm').onsubmit = function (e) {
+    e.preventDefault();
+    var desc = $('editDesc').value.trim(), g = $('editGoal').value;
+    var bad = [setErr('editDesc', descError(desc)) && $('editDesc'), setErr('editGoal', g ? '' : 'Please choose a goal.') && $('editGoal')].filter(Boolean);
+    if (bad.length) { bad[0].focus(); return; }
+    var p = editing;
+    $('editDialog').close();
+    confirmBox({ icon: '✏️', title: 'Update this post?', text: 'Your changes will be saved and shown on the goal page.', yes: 'Yes, update' }).then(function (ok) {
+      if (!ok) { $('editDialog').showModal(); return; }
+      var newPath = null;
+      var step = editBlob ? upload(editBlob).then(function (path) { newPath = path; }) : Promise.resolve();
+      return step.then(function () {
+        var changes = { description: desc, goalId: Number(g), updatedAt: new Date().toISOString() };
+        if (newPath) changes.imagePath = newPath;
+        return sb.from('post').update(changes).eq('id', p.id).then(function (r) {
+          if (r.error) { if (newPath) removeImage(newPath); throw r.error; }
+          if (newPath) removeImage(p.imagePath);   // old photo no longer needed
+          renderView(); toast('✅ Your post has been updated.');
+        });
+      });
+    }).catch(function (err) { $('editDialog').showModal(); $('editError').textContent = friendly(err); });
+  };
+
+  // ---------- Start: check the login ----------
+  // Old links like my-posts.html?tab=add&goal=6 -> that goal's page with the form open
+  if (params.get('tab') === 'add') {
+    location.replace('index.html' + (goal(params.get('goal')) ? '?view=sdg&id=' + params.get('goal') + '&add=1' : ''));
+    return;
+  }
+  var starting = false;
+  function start() {
+    if (starting) return;
+    starting = true;
+    if (!window.ipsSupabase) { gate('⚠️', 'Login is not available', 'navbarsdg.js did not load.', []); return; }
+    window.ipsSupabase.then(function (client) {
+      sb = client;
+      return sb.auth.getSession();
+    }).then(function (res) {
+      var session = res && res.data && res.data.session;
+      if (!session) {
+        gate('🔒', 'Please log in', 'Log in to add a post or manage your posts. Anyone can still view posts on the goal pages.', [
+          { label: 'Log in', onClick: function () { window.ipsOpenLogin('login'); } },
+          { label: 'Sign up', light: true, onClick: function () { window.ipsOpenLogin('signup'); } }
+        ]);
+        return;
+      }
+      return sb.from('user').select('*').eq('id', session.user.id).maybeSingle().then(function (r) {
+        if (r.error) throw r.error;
+        var row = r.data;
+        if (!row || !row.className || !row.section) {
+          gate('🧾', 'Complete your profile', 'Please add your class and section before posting.', [
+            { label: 'Complete profile', onClick: function () { window.ipsOpenLogin('profile'); } }
+          ]);
+          return;
+        }
+        me = { id: row.id, firstName: row.firstName, lastName: row.lastName };
+        render();
+      });
+    }).catch(function (err) {
+      gate('⚠️', 'Could not open My Home', friendly(err), [{ label: 'Try again', onClick: function () { location.reload(); } }]);
+    }).then(function () { starting = false; });
+  }
+  // Re-check when the user logs in or out from the navbar
+  window.addEventListener('ips-profile-change', function () {
+    var profile = window.ipsCurrentProfile();
+    if (!profile) {
+      // Logged out: remove the welcome message and the Add / View options
+      if (!me) return;
+      me = null;
+      ['editDialog', 'confirmDialog'].forEach(function (id) { if ($(id).open) $(id).close(); });
+      history.replaceState(null, '', location.pathname);
+      gate('👋', 'You have logged out', 'You have been logged out successfully. Log in again to add or manage your posts. Anyone can still view posts on the goal pages.', [
+        { label: 'Log in', onClick: function () { window.ipsOpenLogin('login'); } },
+        { label: 'Sign up', light: true, onClick: function () { window.ipsOpenLogin('signup'); } }
+      ]);
+      return;
+    }
+    if (!me || profile.id !== me.id) start();   // someone logged in
+  });
+  start();
+})();
+</script>
+</body>
+</html>

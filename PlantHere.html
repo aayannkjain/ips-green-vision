@@ -145,9 +145,9 @@ var AI={
   vs:function(n,tc){if(n===null)return null;var ns;if(n>=0.5)ns=100;else if(n>=0.3)ns=60+(n-0.3)*200;else if(n>=0.15)ns=30+(n-0.15)*200;else if(n>=0)ns=n*200;else ns=0;var tcs=tc!==null?Math.min(100,tc*1.2):50;return Math.round(ns*0.65+tcs*0.35)},
   ts:function(e,lc){if(e===null)return null;var es;if(e>=0&&e<=1500)es=100;else if(e>1500&&e<=2500)es=100-(e-1500)*0.05;else if(e>2500&&e<=3500)es=50-(e-2500)*0.03;else if(e>3500)es=Math.max(0,20-(e-3500)*0.02);else es=80;var l=this.LANDCOVER[lc]||{p:20};return Math.round(es*0.5+Math.max(0,100-l.p)*0.5)},
   suit:function(c){var t=pn(c.temperature_C),r=pn(c.rainfall),n=pn(c.ndvi),tc=pn(c.treecover),e=pn(c.elevation),lc=pn(c.landcover);var cs=this.cs(t,r),vs=this.vs(n,tc),ts=this.ts(e,lc);if(cs===null||vs===null||ts===null)return null;var pen=0;if(tc!==null&&tc>70)pen=(tc-70)*0.5;if(lc===80||lc===100)return 0;var s=cs*0.40+vs*0.25+ts*0.35;return Math.round(Math.min(100,Math.max(0,s-pen)))},
-  species:function(t,r){if(t===null||r===null)return[];if(t>=22&&r>=1500)return["Teak","Neem","Banyan","Mahogany","Bamboo"];if(t>=22&&r>=500)return["Neem","Babool","Eucalyptus","Gulmohar","Jamun"];if(t>=15&&t<22&&r>=800)return["Oak","Pine","Cedar","Maple","Chestnut"];if(t>=15&&r<800)return["Olive","Cork Oak","Cypress","Eucalyptus","Carob"];if(t>=5&&t<15&&r>=500)return["Oak","Beech","Birch","Spruce","Elm"];if(t>=0&&t<5)return["Spruce","Pine","Larch","Birch","Aspen"];if(r<300)return["Acacia","Date Palm","Tamarisk","Jojoba","Prosopis"];if(t<0)return["Siberian Larch","Dwarf Pine","Arctic Willow"];return["Native species"]},
+  species:function(t,r){if(t===null||r===null)return[];if(t>=22&&r>=1500)return["Teak","Neem","Banyan","Mahogany","Bamboo"];if(t>=22&&r>=500)return["Neem","Babool","Eucalyptus","Gulmohar","Jamun"];if(t>=22)return["Khejri","Neem","Babool","Ber","Date Palm"];if(t>=5&&r<300)return["Acacia","Date Palm","Tamarisk","Jojoba","Prosopis"];if(t>=15&&t<22&&r>=800)return["Oak","Pine","Cedar","Maple","Chestnut"];if(t>=15&&r<800)return["Olive","Cork Oak","Cypress","Eucalyptus","Carob"];if(t>=5&&t<15&&r>=500)return["Oak","Beech","Birch","Spruce","Elm"];if(t>=0&&t<5)return["Spruce","Pine","Larch","Birch","Aspen"];if(r<300)return["Acacia","Date Palm","Tamarisk","Jojoba","Prosopis"];if(t<0)return["Siberian Larch","Dwarf Pine","Arctic Willow"];return["Native species"]},
   verdict:function(s){if(s===null)return{t:"No Data",c:"#6b7280"};if(s>=75)return{t:"Highly Suitable",c:"#22c55e"};if(s>=50)return{t:"Suitable",c:"#84cc16"};if(s>=25)return{t:"Marginal",c:"#eab308"};return{t:"Not Suitable",c:"#ef4444"}},
-  zone:function(t,r){if(t===null)return"Unknown";if(t>=22&&r>=1500)return"Tropical Wet";if(t>=22&&r>=500)return"Tropical Dry";if(t>=22)return"Arid Hot";if(t>=15&&r>=800)return"Subtropical";if(t>=15)return"Mediterranean";if(t>=5&&r>=500)return"Temperate";if(t>=5)return"Semi-Arid";if(t>=0)return"Cold Temperate";return"Cold/Arctic"},
+  zone:function(t,r){if(t===null||r===null)return"Unknown";if(t>=22&&r>=1500)return"Tropical Wet";if(t>=22&&r>=500)return"Tropical Dry";if(t>=22)return"Arid Hot";if(t>=15&&r>=800)return"Subtropical";if(t>=15)return"Mediterranean";if(t>=5&&r>=500)return"Temperate";if(t>=5)return"Semi-Arid";if(t>=0)return"Cold Temperate";return"Cold/Arctic"},
   lcName:function(lc){return(this.LANDCOVER[lc]||{n:"Unknown"}).n}
 };
 function pn(v){if(v===""||v===undefined||v===null)return null;var n=Number(v);return isNaN(n)?null:n}
@@ -235,34 +235,36 @@ function searchForSpots(lat,lng){
   if(radiusCircle){map.removeLayer(radiusCircle);radiusCircle=L.circle([lat,lng],{radius:searchRadius*1000,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:0.06,weight:1,dashArray:'6,10'}).addTo(map)}
 
   var r=searchRadius*1000;
-  var q='[out:json][timeout:25];('+
-    'node["leisure"="park"](around:'+r+','+lat+','+lng+');'+
-    'way["leisure"="park"](around:'+r+','+lat+','+lng+');'+
-    'way["leisure"="garden"](around:'+r+','+lat+','+lng+');'+
-    'node["leisure"="garden"](around:'+r+','+lat+','+lng+');'+
-    'way["landuse"="meadow"](around:'+r+','+lat+','+lng+');'+
-    'way["landuse"="grass"](around:'+r+','+lat+','+lng+');'+
-    'way["landuse"="recreation_ground"](around:'+r+','+lat+','+lng+');'+
-    'way["landuse"="village_green"](around:'+r+','+lat+','+lng+');'+
-    'way["landuse"="brownfield"](around:'+r+','+lat+','+lng+');'+
-    'way["landuse"="greenfield"](around:'+r+','+lat+','+lng+');'+
-    'way["natural"="scrub"](around:'+r+','+lat+','+lng+');'+
-    'node["highway"="bus_stop"](around:'+r+','+lat+','+lng+');'+
-    ');out center 80;';
+  // A bounding box is much faster for the servers than "around"; spots outside
+  // the circle are removed afterwards in processSpots.
+  var dLat=r/111320, dLng=r/(111320*Math.cos(lat*Math.PI/180));
+  var B='('+(lat-dLat).toFixed(5)+','+(lng-dLng).toFixed(5)+','+(lat+dLat).toFixed(5)+','+(lng+dLng).toFixed(5)+');';
+  var q='[out:json][timeout:20];('+
+    'nw["leisure"~"^(park|garden)$"]'+B+
+    'way["landuse"~"^(meadow|grass|recreation_ground|village_green|brownfield|greenfield)$"]'+B+
+    'way["natural"="scrub"]'+B+
+    'node["highway"="bus_stop"]'+B+
+    ');out center qt 120;';
 
-  fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    headers: {"Content-Type": "application/x-www-form-urlencoded"},
-    body: "data=" + encodeURIComponent(q)
-  })
-  .then(function(res){return res.json()})
+  var myRequest=++searchCounter;   // ignore answers from older searches
+  fetchSpots(q,lat,lng,searchRadius)
   .then(function(data){
+    if(myRequest!==searchCounter)return;
     document.getElementById("spotLoading").style.display="none";
-    processSpots(data.elements,lat,lng);
+    processSpots((data&&data.elements)||[],lat,lng);
+    if(data.source==="backup")document.getElementById("locationInfo").innerHTML+='<br><span style="color:#9ca3af;font-size:12px">ℹ The main map server is busy, so only parks and gardens are shown. Try again later for roadsides and open land.</span>';
   })
   .catch(function(err){
+    if(myRequest!==searchCounter)return;
     document.getElementById("spotLoading").style.display="none";
-    document.getElementById("locationInfo").innerHTML="❌ Network error. Check internet connection.";
+    document.getElementById("defaultContent").style.display="block";
+    var msg;
+    if(err.status===429)msg="⏳ The map data server is busy (too many requests). Please wait a minute and try again.";
+    else if(err.status===504||err.status===503||err.status===502)msg="⏳ The map data server timed out. Try again, or choose a smaller radius.";
+    else if(err.status)msg="❌ The map data server returned an error ("+err.status+"). Please try again later.";
+    else if(!navigator.onLine)msg="❌ You appear to be offline. Check your internet connection.";
+    else msg="❌ Could not reach the map data server. Please try again.";
+    document.getElementById("locationInfo").innerHTML=msg;
     console.error(err);
   });
 }
@@ -278,19 +280,18 @@ function processSpots(elements,uLat,uLng){
     var tags=el.tags||{};
     var name=tags.name||tags["name:en"]||null;
     var type=getType(tags);
-    spots.push({lat:lat,lng:lng,name:name,type:type.type,icon:type.icon,bonus:type.bonus,distance:haversineKm(uLat,uLng,lat,lng),tags:tags});
+    var dkm=haversineKm(uLat,uLng,lat,lng);if(dkm>searchRadius)return;
+    spots.push({lat:lat,lng:lng,name:name,type:type.type,icon:type.icon,bonus:type.bonus,distance:dkm,tags:tags});
   });
 
-  if(nearestCity){
-    var base=AI.suit(nearestCity);
-    spots.forEach(function(s){s.score=base!==null?Math.min(100,Math.max(0,base+s.bonus-Math.round(Math.min(10,s.distance*3)))):null});
-  }
-  spots.sort(function(a,b){return(b.score||0)-(a.score||0)});
+  var base=nearestCity?AI.suit(nearestCity):null;
+  spots.forEach(function(s){s.score=base!==null?Math.min(100,Math.max(0,base+s.bonus-Math.round(Math.min(10,s.distance*3)))):null});
+  spots.sort(function(a,b){return(b.score===null||b.score===undefined?-1:b.score)-(a.score===null||a.score===undefined?-1:a.score)});
   spots=spots.slice(0,30);
   foundSpots=spots;
   renderList(spots);
   addMarkers(spots);
-  document.getElementById("locationInfo").innerHTML="📍 Found <b>"+spots.length+"</b> spots within "+searchRadius+" km";
+  document.getElementById("locationInfo").innerHTML="📍 Found <b>"+spots.length+"</b> spots within "+searchRadius+" km"+(base===null&&spots.length?'<br><span style="color:#eab308">⚠ Climate data is missing for the nearest city ('+(nearestCity?(nearestCity.city_ascii||nearestCity.city):"unknown")+'), so spots cannot be scored.</span>':"");
 }
 
 function getType(t){
@@ -315,7 +316,7 @@ function renderList(spots){
   spots.forEach(function(s,i){
     var v=AI.verdict(s.score);
     var dist=s.distance<1?(s.distance*1000).toFixed(0)+"m":s.distance.toFixed(1)+"km";
-    h+='<div class="spot-card" data-i="'+i+'"><div class="spot-num">'+(i+1)+'</div><div class="spot-info"><div class="spot-name">'+s.icon+' '+(s.name||s.type+' near you')+'</div><div class="spot-meta"><span class="spot-type-tag">'+s.type+'</span>'+dist+'</div></div><div class="spot-score-wrap"><div class="spot-score" style="color:'+v.c+'">'+(s.score||"—")+'</div><div class="spot-score-label">/100</div></div></div>';
+    h+='<div class="spot-card" data-i="'+i+'"><div class="spot-num">'+(i+1)+'</div><div class="spot-info"><div class="spot-name">'+s.icon+' '+esc(s.name||s.type+' near you')+'</div><div class="spot-meta"><span class="spot-type-tag">'+s.type+'</span>'+dist+'</div></div><div class="spot-score-wrap"><div class="spot-score" style="color:'+v.c+'">'+fmtScore(s.score)+'</div><div class="spot-score-label">/100</div></div></div>';
   });
   c.innerHTML=h;
   c.querySelectorAll(".spot-card").forEach(function(card){
@@ -332,7 +333,7 @@ function addMarkers(spots){
   spots.forEach(function(s,i){
     var v=AI.verdict(s.score);
     var m=L.marker([s.lat,s.lng],{icon:L.divIcon({className:'',html:'<div style="background:'+v.c+';color:'+(s.score>=50?"#000":"#fff")+';width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)">'+(i+1)+'</div>',iconSize:[26,26],iconAnchor:[13,13]})}).addTo(map);
-    m.bindTooltip('<b>'+(s.name||s.type)+'</b><br>Score: '+(s.score||"N/A")+'/100');
+    m.bindTooltip('<b>'+esc(s.name||s.type)+'</b><br>Score: '+(hasScore(s.score)?s.score+'/100':'no data')+'');
     m.on("click",function(){selectSpot(i)});
     spotMarkers.push(m);
   });
@@ -340,7 +341,7 @@ function addMarkers(spots){
 
 // ===== SELECT SPOT =====
 function selectSpot(i){
-  var s=foundSpots[i];if(!s)return;
+  var s=foundSpots[i];if(!s||!nearestCity)return;
   map.flyTo([s.lat,s.lng],17,{duration:1});
   var p=document.getElementById("spotDetail");p.style.display="block";
   var v=AI.verdict(s.score);
@@ -348,34 +349,38 @@ function selectSpot(i){
   var t=pn(nc.temperature_C),r=pn(nc.rainfall),n=pn(nc.ndvi),tc=pn(nc.treecover),e=pn(nc.elevation),lc=pn(nc.landcover);
   var cScore=AI.cs(t,r),vScore=AI.vs(n,tc),tScore=AI.ts(e,lc);
   var zone=AI.zone(t,r),species=AI.species(t,r);
-  var nm=s.name||s.type+" near you";
+  var nm=esc(s.name||s.type+" near you");
   var dist=s.distance<1?(s.distance*1000).toFixed(0)+"m":s.distance.toFixed(1)+"km";
   var trees=s.type==="Park"?20:s.type==="Meadow"?30:s.type==="Grassland"?25:s.type==="Garden"?5:s.type==="Roadside"?3:10;
-  var survival=s.score>=75?85:s.score>=50?70:s.score>=25?50:30;
+  var scored=hasScore(s.score);
+  var survival=!scored?null:s.score>=75?85:s.score>=50?70:s.score>=25?50:30;
   var water=r===null?"Unknown":r<400?"High — irrigation needed":r<800?"Moderate — seasonal watering":"Low — adequate rainfall";
 
   p.innerHTML='<h2>🌱 Spot #'+(i+1)+' Analysis</h2>'+
-    '<div class="main-score"><div class="big-number" style="color:'+v.c+'">'+(s.score||"—")+'</div><div class="big-label">Planting Suitability</div><div class="verdict" style="background:'+v.c+'22;color:'+v.c+'">'+v.t+'</div></div>'+
+    '<div class="main-score"><div class="big-number" style="color:'+v.c+'">'+fmtScore(s.score)+'</div><div class="big-label">Planting Suitability</div><div class="verdict" style="background:'+v.c+'22;color:'+v.c+'">'+v.t+'</div></div>'+
     '<div style="font-size:15px;font-weight:700;margin-bottom:2px">'+s.icon+' '+nm+'</div>'+
     '<div style="font-size:12px;color:#6b7280;margin-bottom:12px"><span class="spot-type-tag">'+s.type+'</span>'+dist+' · '+zone+'</div>'+
     sb("Climate Score",cScore)+sb("Vegetation Score",vScore)+sb("Terrain Score",tScore)+
     '<div class="detail-grid">'+
       di("🌡 Temperature",t!==null?t.toFixed(1)+"°C":"N/A")+di("🌧 Rainfall",r!==null?Math.round(r)+"mm/yr":"N/A")+
       di("🌳 Tree Cover",tc!==null?tc.toFixed(0)+"%":"N/A")+di("⛰ Elevation",e!==null?Math.round(e)+"m":"N/A")+
-      di("🌲 Trees Plantable","~"+trees+" trees")+di("🎯 Survival Rate","~"+survival+"%")+
+      di("🌲 Trees Plantable","~"+trees+" trees")+di("🎯 Survival Rate",survival===null?"Unknown":"~"+survival+"%")+
       di("💧 Water Need",water)+di("🌍 CO₂/10yr","~"+(trees*22*10)+"kg")+
     '</div>'+
-    '<div class="recommendation"><h3>🌱 Best Species</h3><div class="species-list">'+species.map(function(x){return'<span class="species-tag">'+x+'</span>'}).join("")+'</div></div>'+
+    '<div class="recommendation"><h3>🌱 Best Species</h3><div class="species-list">'+(species.length?species.map(function(x){return'<span class="species-tag">'+x+'</span>'}).join(""):'<span style="color:#9ca3af;font-size:13px">Not enough climate data — ask a local nursery for native species.</span>')+'</div></div>'+
     '<div class="recommendation" style="margin-top:10px"><h3>📋 Planting Guide</h3><p>'+advice(s,t,r,species,zone,survival)+'</p></div>'+
     '<a href="https://www.google.com/maps/dir/?api=1&origin='+userLat+','+userLng+'&destination='+s.lat+','+s.lng+'&travelmode=walking" target="_blank" class="directions-btn">🚶 Get Walking Directions</a>'+
     '<a href="https://www.google.com/maps/dir/?api=1&origin='+userLat+','+userLng+'&destination='+s.lat+','+s.lng+'&travelmode=driving" target="_blank" class="directions-btn directions-btn--drive">🚗 Get Driving Directions</a>';
   document.getElementById("sidebar").scrollTop=0;
 }
 
-function sb(l,s){var c=sc(s);return'<div class="score-row"><span class="score-label">'+l+'</span><span class="score-value" style="color:'+c+'">'+(s!==null?s:"—")+'</span></div><div class="score-bar"><div class="score-bar-fill" style="width:'+(s||0)+'%;background:'+c+'"></div></div>'}
+function hasScore(v){return v!==null&&v!==undefined&&!isNaN(v)}
+function fmtScore(v){return hasScore(v)?v:"—"}
+function sb(l,s){var c=sc(s);return'<div class="score-row"><span class="score-label">'+l+'</span><span class="score-value" style="color:'+c+'">'+fmtScore(s)+'</span></div><div class="score-bar"><div class="score-bar-fill" style="width:'+(s||0)+'%;background:'+c+'"></div></div>'}
 function di(l,v){return'<div class="detail-item"><div class="label">'+l+'</div><div class="value">'+v+'</div></div>'}
 
 function advice(s,t,r,sp,z,sv){
+  if(!hasScore(s.score))return "Climate data (temperature or rainfall) is not available for the nearest city, so this spot could not be scored. It may still be a good place to plant — check the site in person and ask a local nursery which native trees grow well here.";
   var a="This "+s.type.toLowerCase()+" is ";
   a+=s.score>=75?"an excellent spot for planting. ":s.score>=50?"a good candidate with some prep needed. ":s.score>=25?"challenging but possible. ":"very difficult for trees. ";
   if(s.type==="Park")a+="Parks have existing soil and often irrigation access. Check with local authorities. ";
@@ -388,7 +393,116 @@ function advice(s,t,r,sp,z,sv){
   return a;
 }
 
+// ===== OVERPASS (OpenStreetMap) REQUEST =====
+// Asks three public Overpass servers at the same time and uses whichever
+// answers first. (GitHub Pages cannot run a server-side proxy, so the page
+// talks to these servers directly.)
+var OVERPASS_SERVERS=[
+  "https://overpass.private.coffee/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter"
+];
+var searchCounter=0;
+
+function askServer(url,query,ms){
+  var ctrl=typeof AbortController!=="undefined"?new AbortController():null;
+  var timer=ctrl?setTimeout(function(){ctrl.abort()},ms):null;
+  return fetch(url,{
+    method:"POST",
+    headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8"},
+    body:"data="+encodeURIComponent(query),
+    signal:ctrl?ctrl.signal:undefined
+  }).then(function(res){
+    if(!res.ok){var e=new Error("Overpass HTTP "+res.status);e.status=res.status;throw e}
+    return res.json();
+  }).then(function(data){
+    if(timer)clearTimeout(timer);
+    if(!data||!Array.isArray(data.elements))throw new Error("Unexpected response");
+    return data;
+  },function(err){
+    if(timer)clearTimeout(timer);
+    if(err&&err.name==="AbortError")err=new Error("No answer within "+Math.round(ms/1000)+" s");
+    console.warn("Overpass server failed:",url,err.message||err);
+    throw err;
+  });
+}
+// Resolves with the first success; rejects only if every request fails
+function firstSuccess(promises){
+  return new Promise(function(resolve,reject){
+    var left=promises.length,lastErr;
+    promises.forEach(function(p){p.then(resolve,function(e){lastErr=e;if(--left===0)reject(lastErr)})});
+  });
+}
+function fetchOverpass(query){
+  return firstSuccess(OVERPASS_SERVERS.map(function(u){return askServer(u,query,25000)}));
+}
+
+// ===== BACKUP SEARCH (Nominatim + Photon, both OpenStreetMap) =====
+// Used when every Overpass server is blocked or overloaded. They return
+// fewer kinds of places (mostly parks and gardens) but answer reliably.
+function getJSON(url,ms){
+  var ctrl=typeof AbortController!=="undefined"?new AbortController():null;
+  var timer=ctrl?setTimeout(function(){ctrl.abort()},ms):null;
+  return fetch(url,{signal:ctrl?ctrl.signal:undefined}).then(function(res){
+    if(timer)clearTimeout(timer);
+    if(!res.ok){var e=new Error("HTTP "+res.status);e.status=res.status;throw e}
+    return res.json();
+  },function(err){if(timer)clearTimeout(timer);throw err});
+}
+function wait(ms){return new Promise(function(r){setTimeout(r,ms)})}
+function nominatim(word,lat,lng,km){
+  var dLat=km/111.32,dLng=km/(111.32*Math.cos(lat*Math.PI/180));
+  var url="https://nominatim.openstreetmap.org/search?format=jsonv2&bounded=1&limit=40&q="+encodeURIComponent(word)+
+    "&viewbox="+(lng-dLng).toFixed(5)+","+(lat+dLat).toFixed(5)+","+(lng+dLng).toFixed(5)+","+(lat-dLat).toFixed(5);
+  return getJSON(url,15000).then(function(list){
+    return (list||[]).map(function(x){var t={name:x.name||null};t[x.category]=x.type;return{lat:Number(x.lat),lon:Number(x.lon),tags:t}});
+  });
+}
+function photon(tag,lat,lng){
+  var url="https://photon.komoot.io/api/?q="+encodeURIComponent(tag.split(":")[1])+"&lat="+lat.toFixed(5)+"&lon="+lng.toFixed(5)+"&limit=50&osm_tag="+encodeURIComponent(tag);
+  return getJSON(url,15000).then(function(geo){
+    return ((geo&&geo.features)||[]).map(function(f){var p=f.properties||{},t={name:p.name||null};t[p.osm_key]=p.osm_value;return{lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0],tags:t}});
+  });
+}
+function backupSearch(lat,lng,km){
+  // Nominatim allows about 1 request per second, so the two searches are spaced out
+  var nomi=nominatim("park",lat,lng,km).then(function(a){
+    return wait(1100).then(function(){return nominatim("garden",lat,lng,km)}).then(function(b){return a.concat(b)},function(){return a});
+  });
+  var phot=Promise.all([photon("leisure:park",lat,lng).catch(function(){return[]}),photon("leisure:garden",lat,lng).catch(function(){return[]})])
+    .then(function(r){var all=r[0].concat(r[1]);if(!all.length)throw new Error("Photon found nothing");return all});
+  return firstSuccess([nomi.then(function(a){if(!a.length)throw new Error("Nominatim found nothing");return a}),phot]);
+}
+
+// Runs Overpass and the backup search at the same time.
+// Overpass gives the most complete results, so it gets up to 12 s;
+// after that, whichever has an answer is used.
+function fetchSpots(query,lat,lng,km){
+  var cacheKey="ips-spots:"+query;   // re-use a recent answer for the same search
+  try{var hit=JSON.parse(sessionStorage.getItem(cacheKey)||"null");if(hit&&Date.now()-hit.t<30*60*1000)return Promise.resolve(hit.v)}catch(_){}
+  function save(v){if(v.elements.length){try{sessionStorage.setItem(cacheKey,JSON.stringify({t:Date.now(),v:v}))}catch(_){}}return v}
+
+  var over=fetchOverpass(query).then(function(d){return{elements:d.elements,source:"overpass"}});
+  var back=backupSearch(lat,lng,km).then(function(e){return{elements:e,source:"backup"}});
+  over.catch(function(){});back.catch(function(){});
+
+  return new Promise(function(resolve,reject){
+    var done=false,overFailed=false,backResult=null,backFailed=false,grace=false;
+    function finish(v){if(!done){done=true;resolve(save(v))}}
+    function check(){
+      if(done)return;
+      if(backResult&&(overFailed||grace))return finish(backResult);
+      if(overFailed&&backFailed){done=true;reject(new Error("All map data services failed"))}
+    }
+    over.then(finish,function(){overFailed=true;check()});
+    back.then(function(v){backResult=v;check()},function(){backFailed=true;check()});
+    setTimeout(function(){grace=true;if(!done)document.getElementById("locationInfo").innerHTML="📡 Still searching map data...";check()},12000);
+  });
+}
+
 // ===== HELPERS =====
+// OpenStreetMap names are written by the public, so escape them before putting them in HTML
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function haversineKm(a,b,c,d){var R=6371,p=Math.PI/180,dL=(c-a)*p,dN=(d-b)*p;var x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*p)*Math.cos(c*p)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 function findNearestCity(lat,lng){var b=null,bd=Infinity;for(var i=0;i<cities.length;i++){var c=cities[i],d=(lat-Number(c.lat))*(lat-Number(c.lat))+(lng-Number(c.lng))*(lng-Number(c.lng));if(d<bd){bd=d;b=c}}return b}
 
