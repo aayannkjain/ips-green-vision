@@ -36,7 +36,10 @@
   .field-error{color:var(--red);font-size:12px;margin-top:5px}.field-error:empty{display:none}
   .hint{color:#7a8e7e;font-size:12px;margin-top:6px}
   .counter{text-align:right;color:#7a8e7e;font-size:12px;margin-top:5px}.counter.full{color:var(--red);font-weight:700}
-  .preview{display:none;margin-top:12px;max-width:100%;max-height:260px;border-radius:12px;object-fit:contain;background:#eef5ef}
+  .previews{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:12px}.previews:empty{display:none}
+  .previews img{display:block;width:100%;height:96px;border-radius:10px;object-fit:cover;background:#eef5ef}
+  .photo-count{position:absolute;right:8px;bottom:8px;padding:2px 8px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;font-weight:700}
+  .post-thumb{position:relative}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 22px;border:0;border-radius:10px;background:var(--green);color:#fff;font:700 15px "DM Sans",sans-serif;cursor:pointer;text-decoration:none}
   .btn:hover{background:var(--green-dark)}.btn:disabled{opacity:.6;cursor:wait}
   .btn.light{background:var(--green-light);color:var(--green-dark)}
@@ -81,10 +84,10 @@
 <dialog id="editDialog" aria-labelledby="editTitle">
   <h2 id="editTitle">✏️ Edit post</h2>
   <form id="editForm" novalidate>
-    <label for="editImage">Change image <span class="hint">(optional, max 2 MB after shrinking)</span></label>
-    <input type="file" id="editImage" accept="image/*">
+    <label for="editImage">Change photos <span class="hint">(optional · up to 10 · choosing new photos replaces all current photos)</span></label>
+    <input type="file" id="editImage" accept="image/*" multiple>
     <p class="field-error" id="editImage-err"></p>
-    <img class="preview" id="editPreview" alt="Post image">
+    <div class="previews" id="editPreviews"></div>
     <label for="editDesc">Description <span class="req">*</span></label>
     <textarea id="editDesc" maxlength="500" placeholder="Describe what you did for this goal"></textarea>
     <div class="counter" id="editCounter">0 / 500</div>
@@ -218,7 +221,14 @@
       if (r.error) throw r.error; return path;
     });
   }
-  function removeImage(path) { return sb.storage.from(BUCKET).remove([path]).catch(function () {}); }
+  // Accepts one path or a list of paths
+  function removeImage(paths) {
+    paths = [].concat(paths).filter(Boolean);
+    return paths.length ? sb.storage.from(BUCKET).remove(paths).catch(function () {}) : Promise.resolve();
+  }
+  // All photos of a post: the first in "imagePath", the others in "extraImagePaths"
+  function photoPaths(p) { return [p.imagePath].concat(Array.isArray(p.extraImagePaths) ? p.extraImagePaths : []).filter(Boolean); }
+  var MAX_FILES = 10;
 
   // ---------- Page states ----------
   function gate(icon, title, text, buttons) {
@@ -373,10 +383,15 @@
   function postRow(p, likeCount, commentCount) {
     var g = goal(p.goalId);
     var row = document.createElement('article'); row.className = 'post-row';
-    row.innerHTML = '<img alt=""><div><span class="goal-badge"></span><p class="post-desc"></p><p class="post-meta"></p>' +
+    row.innerHTML = '<div class="post-thumb"><img alt=""></div><div><span class="goal-badge"></span><p class="post-desc"></p><p class="post-meta"></p>' +
       '<div class="row-links"><button type="button" class="link edit">✏️ Edit</button><button type="button" class="link del">🗑️ Delete</button></div></div>';
     row.querySelector('img').src = imageUrl(p.imagePath);
     row.querySelector('img').alt = 'Your post for SDG ' + p.goalId;
+    var count = photoPaths(p).length;
+    if (count > 1) {
+      var chip = document.createElement('span'); chip.className = 'photo-count'; chip.textContent = '📷 ' + count;
+      row.querySelector('.post-thumb').appendChild(chip);
+    }
     var badge = row.querySelector('.goal-badge'); badge.textContent = 'SDG ' + g[0] + ' · ' + g[1]; badge.style.background = g[2];
     row.querySelector('.post-desc').textContent = p.description;
     row.querySelector('.post-meta').textContent = 'Posted ' + when(p.createdAt) + (p.updatedAt ? ' · Updated ' + when(p.updatedAt) : '') + ' · ♥ ' + likeCount + ' · 💬 ' + commentCount;
@@ -392,20 +407,26 @@
         if (!ok) return;
         return sb.from('post').delete().eq('id', p.id).then(function (r) {
           if (r.error) throw r.error;
-          removeImage(p.imagePath);
+          removeImage(photoPaths(p));
           renderView(); toast('🗑️ Your post has been deleted.');
         });
       }).catch(function (err) { toast('⚠️ ' + friendly(err)); });
   }
 
   // ---------- EDIT ----------
-  var editing = null, editBlob = null;
+  var editing = null, editBlobs = [];
   $('editGoal').innerHTML = goalOptions();
   wireCounter('editDesc', 'editCounter');
+  function showPreviews(srcs) {
+    var box = $('editPreviews'); box.innerHTML = '';
+    srcs.forEach(function (src, i) {
+      var img = document.createElement('img'); img.src = src; img.alt = 'Photo ' + (i + 1); box.appendChild(img);
+    });
+  }
   function openEdit(p) {
-    editing = p; editBlob = null;
+    editing = p; editBlobs = [];
     $('editImage').value = ''; setErr('editImage', ''); setErr('editDesc', ''); setErr('editGoal', ''); $('editError').textContent = '';
-    $('editPreview').src = imageUrl(p.imagePath); $('editPreview').style.display = 'block';
+    showPreviews(photoPaths(p).map(imageUrl));
     $('editDesc').value = p.description; $('editDesc').dispatchEvent(new Event('input'));
     $('editGoal').value = String(p.goalId);
     $('editSave').disabled = false; $('editSave').textContent = '💾 Save changes';
@@ -413,11 +434,17 @@
   }
   $('editCancel').onclick = function () { $('editDialog').close(); };
   $('editImage').onchange = function () {
-    editBlob = null; setErr('editImage', '');
-    var f = this.files[0]; if (!f) { $('editPreview').src = imageUrl(editing.imagePath); return; }
+    editBlobs = []; setErr('editImage', '');
+    var input = this, list = Array.prototype.slice.call(input.files || []);
+    if (!list.length) { showPreviews(photoPaths(editing).map(imageUrl)); return; }
+    if (list.length > MAX_FILES) { setErr('editImage', 'Please select up to ' + MAX_FILES + ' photos.'); input.value = ''; showPreviews(photoPaths(editing).map(imageUrl)); return; }
     $('editSave').disabled = true;
-    shrinkImage(f).then(function (b) { editBlob = b; $('editPreview').src = URL.createObjectURL(b); })
-      .catch(function (e) { setErr('editImage', e.message); $('editImage').value = ''; })
+    // shrink one photo at a time (keeps phones from running out of memory)
+    list.reduce(function (chain, f) {
+      return chain.then(function (out) { return shrinkImage(f).then(function (b) { out.push(b); return out; }); });
+    }, Promise.resolve([]))
+      .then(function (blobs) { editBlobs = blobs; showPreviews(blobs.map(function (b) { return URL.createObjectURL(b); })); })
+      .catch(function (e) { setErr('editImage', e.message); input.value = ''; showPreviews(photoPaths(editing).map(imageUrl)); })
       .then(function () { $('editSave').disabled = false; });
   };
   $('editForm').onsubmit = function (e) {
@@ -429,17 +456,27 @@
     $('editDialog').close();
     confirmBox({ icon: '✏️', title: 'Update this post?', text: 'Your changes will be saved and shown on the goal page.', yes: 'Yes, update' }).then(function (ok) {
       if (!ok) { $('editDialog').showModal(); return; }
-      var newPath = null;
-      var step = editBlob ? upload(editBlob).then(function (path) { newPath = path; }) : Promise.resolve();
+      var newPaths = [];
+      // upload the new photos one after another
+      var step = editBlobs.reduce(function (chain, blob) {
+        return chain.then(function () { return upload(blob).then(function (path) { newPaths.push(path); }); });
+      }, Promise.resolve());
       return step.then(function () {
         var changes = { description: desc, goalId: Number(g), updatedAt: new Date().toISOString() };
-        if (newPath) changes.imagePath = newPath;
+        if (newPaths.length) {
+          changes.imagePath = newPaths[0];
+          // only send the extra-photos column when needed (works before the database update too)
+          if (newPaths.length > 1 || 'extraImagePaths' in p) changes.extraImagePaths = newPaths.slice(1);
+        }
         return sb.from('post').update(changes).eq('id', p.id).then(function (r) {
-          if (r.error) { if (newPath) removeImage(newPath); throw r.error; }
-          if (newPath) removeImage(p.imagePath);   // old photo no longer needed
+          if (r.error) {
+            if (/extraImagePaths/.test(r.error.message || '')) throw new Error('Several photos in one post needs a one-time database update (see README: "Several photos in one post"). For now, choose one photo.');
+            throw r.error;
+          }
+          if (newPaths.length) removeImage(photoPaths(p));   // old photos no longer needed
           renderView(); toast('✅ Your post has been updated.');
         });
-      });
+      }).catch(function (err) { removeImage(newPaths); throw err; });
     }).catch(function (err) { $('editDialog').showModal(); $('editError').textContent = friendly(err); });
   };
 

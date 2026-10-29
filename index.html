@@ -279,11 +279,14 @@ async function fetchPosts(goalId, limit = 100) {
   if (authorError) throw authorError;
   const nameOf = id => { const a = authors.find(x => x.id === id); return a ? `${a.firstName} ${a.lastName}` : "Student"; };
   const orgOf = id => { const a = authors.find(x => x.id === id); return (a && a.orgName) || ""; };
+  const urlOf = path => sb.storage.from("post-images").getPublicUrl(path).data.publicUrl;
   return posts.map(p => ({
     ...p,
     author: nameOf(p.userId),
     orgName: orgOf(p.userId),
-    imageUrl: sb.storage.from("post-images").getPublicUrl(p.imagePath).data.publicUrl,
+    imageUrl: urlOf(p.imagePath),
+    // first photo + any extra photos of the same post
+    imageUrls: [p.imagePath, ...(Array.isArray(p.extraImagePaths) ? p.extraImagePaths : [])].filter(Boolean).map(urlOf),
     likes: likes.data.filter(l => l.postId === p.id).map(l => l.userId),
     comments: comments.data.filter(c => c.postId === p.id).map(c => ({ ...c, author: nameOf(c.userId) })),
   }));
@@ -377,7 +380,35 @@ function PostInteractions({ post, me, onChanged, responseLabel = "Comment" }) {
   );
 }
 
-// One post: author (first + last name only), date, goal, photo, description, likes, comments
+// The photos of one post: a single photo, or a small slideshow with thumbnails
+function PostImages({ urls, alt }) {
+  const [index, setIndex] = useState(0);
+  if (!urls || !urls.length) return null;
+  const n = urls.length, cur = Math.min(index, n - 1);
+  const img = { display: "block", width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12, background: T.bg };
+  if (n === 1) return <img src={urls[0]} alt={alt} loading="lazy" style={{ ...img, marginBottom: 12 }} />;
+  const nav = { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 38, height: 38, border: 0, borderRadius: "50%", background: "rgba(0,0,0,.45)", color: "#fff", fontSize: 22, lineHeight: 1, cursor: "pointer" };
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ position: "relative" }}>
+        <img src={urls[cur]} alt={`${alt} (photo ${cur + 1} of ${n})`} style={img} />
+        <button type="button" aria-label="Previous photo" onClick={() => setIndex((cur - 1 + n) % n)} style={{ ...nav, left: 10 }}>‹</button>
+        <button type="button" aria-label="Next photo" onClick={() => setIndex((cur + 1) % n)} style={{ ...nav, right: 10 }}>›</button>
+        <span style={{ position: "absolute", top: 10, right: 10, padding: "3px 10px", borderRadius: 999, background: "rgba(0,0,0,.55)", color: "#fff", fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif" }}>{cur + 1} / {n}</span>
+      </div>
+      <div style={{ display: "flex", gap: 6, marginTop: 8, overflowX: "auto", paddingBottom: 2 }}>
+        {urls.map((u, k) => (
+          <button key={u} type="button" aria-label={`Show photo ${k + 1}`} aria-current={k === cur} onClick={() => setIndex(k)}
+            style={{ flex: "0 0 auto", padding: 0, border: `2px solid ${k === cur ? T.green : "transparent"}`, borderRadius: 8, background: "none", cursor: "pointer" }}>
+            <img src={u} alt="" loading="lazy" style={{ display: "block", width: 56, height: 56, objectFit: "cover", borderRadius: 6 }} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// One post: author (first + last name only), date, goal, photos, description, likes, comments
 function PostCard({ post, me, onChanged, showGoal, responseLabel }) {
   const sdg = SDGS.find(s => s.id === post.goalId) || SDGS[0];
   return (
@@ -392,7 +423,7 @@ function PostCard({ post, me, onChanged, showGoal, responseLabel }) {
         </div>
         {showGoal && <SDGBadge sdg={sdg} small />}
       </div>
-      <img src={post.imageUrl} alt={`Action shared for SDG ${post.goalId} by ${post.author}`} loading="lazy" style={{ display: "block", width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12, marginBottom: 12, background: T.bg }} />
+      <PostImages urls={post.imageUrls} alt={`Action shared for SDG ${post.goalId} by ${post.author}`} />
       <p style={{ margin: "0 0 12px", fontSize: 14, color: T.text, lineHeight: 1.6, fontFamily: "'DM Sans',sans-serif", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{post.description}</p>
       <PostInteractions post={post} me={me} onChanged={onChanged} responseLabel={responseLabel} />
     </div>
@@ -586,19 +617,21 @@ function AddPostForm({ sdg, onCancel, onPosted }) {
       const user = data && data.session && data.session.user;
       if (!user) throw new Error("not authenticated");
 
-      // The current database schema stores one imagePath per post, so each
-      // selected image is saved as its own post with the same description.
+      // All selected photos belong to ONE post with ONE description:
+      // the first photo goes in "imagePath", the others in "extraImagePaths".
       for (const item of files) {
         const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
         const up = await sb.storage.from("post-images").upload(path, item.blob, { contentType: "image/jpeg", upsert: false });
         if (up.error) throw up.error;
         uploadedPaths.push(path);
       }
-      const rows = uploadedPaths.map(path => ({
-        userId: user.id, goalId: sdg.id, description: text, imagePath: path
-      }));
-      const ins = await sb.from("post").insert(rows);
-      if (ins.error) throw ins.error;
+      const row = { userId: user.id, goalId: sdg.id, description: text, imagePath: uploadedPaths[0] };
+      if (uploadedPaths.length > 1) row.extraImagePaths = uploadedPaths.slice(1);
+      const ins = await sb.from("post").insert(row);
+      if (ins.error) {
+        if (/extraImagePaths/.test(ins.error.message || "")) throw new Error("Posting several photos together needs a one-time database update (see README: \"Several photos in one post\"). For now, please post one photo.");
+        throw ins.error;
+      }
       onPosted();
     } catch (err) {
       if (uploadedPaths.length) {
@@ -614,7 +647,7 @@ function AddPostForm({ sdg, onCancel, onPosted }) {
   return (
     <form onSubmit={submit} noValidate style={{ background: T.card, border: `2px solid ${sdg.color}`, borderRadius: 16, padding: 24, marginBottom: 28, boxShadow: T.shadow }}>
       <h2 style={{ margin: "0 0 4px", fontSize: 19, fontWeight: 700, color: T.text, fontFamily: "'Outfit',sans-serif" }}>➕ Add a post for SDG {sdg.id}</h2>
-      <p style={{ margin: 0, fontSize: 13, color: T.textSec, fontFamily: "'DM Sans',sans-serif" }}>Upload multiple photos for your action. Each photo will appear as a separate Community post with the same description.</p>
+      <p style={{ margin: 0, fontSize: 13, color: T.textSec, fontFamily: "'DM Sans',sans-serif" }}>Upload one or more photos of your action. All photos appear together in one Community post with your description.</p>
 
       <label htmlFor="post-image" style={label}>Upload images <span style={{ color: "#DC2626" }}>*</span></label>
       <input ref={fileRef} id="post-image" type="file" accept="image/*" multiple onChange={pickFiles} disabled={!!busy} aria-invalid={!!errors.image}
@@ -638,7 +671,7 @@ function AddPostForm({ sdg, onCancel, onPosted }) {
 
       {formError && <div role="alert" style={{ marginTop: 14, padding: "10px 12px", borderRadius: 8, background: "#FFF1F2", color: "#B91C1C", fontSize: 13, fontFamily: "'DM Sans',sans-serif" }}>{formError}</div>}
       <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
-        <button type="submit" disabled={!!busy} style={{ minHeight: 44, padding: "0 26px", border: 0, borderRadius: 10, background: sdg.color, color: "#fff", fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, fontFamily: "'DM Sans',sans-serif" }}>{busy || `Post ${files.length || ""} image${files.length === 1 ? "" : "s"}`}</button>
+        <button type="submit" disabled={!!busy} style={{ minHeight: 44, padding: "0 26px", border: 0, borderRadius: 10, background: sdg.color, color: "#fff", fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, fontFamily: "'DM Sans',sans-serif" }}>{busy || (files.length > 1 ? `Post with ${files.length} photos` : "Post")}</button>
         <button type="button" onClick={onCancel} disabled={busy === "Posting…"} style={{ minHeight: 44, padding: "0 18px", border: 0, borderRadius: 10, background: "transparent", color: T.textSec, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>Cancel</button>
       </div>
     </form>
