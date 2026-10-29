@@ -258,7 +258,9 @@
   // ---------- VIEW / UPDATE POSTS ----------
   function renderView() {
     var area = $('tabArea');
-    area.innerHTML = '<section class="panel"><h2>🗂️ Your Posts</h2><p class="sub">Your posts are shown in Community with your first and last name. Only you can edit or delete them.</p><div id="postList"><p class="empty">Loading your posts…</p></div></section>';
+    area.innerHTML = '<section class="panel"><h2>🗂️ Your Posts</h2><p class="sub">Your posts are shown in Community with your first and last name. Only you can edit or delete them.</p><div id="postList"><p class="empty">Loading your posts…</p></div></section>' +
+      '<section class="panel" id="greenTargetPanel" style="margin-top:20px"><h2>🎯 My Green Targets Evidence</h2><p class="sub">Photos and videos you submitted for the Green Targets five-goal challenge.</p><div id="greenTargetList"><p class="empty">Loading your Green Targets evidence…</p></div></section>';
+    renderGreenTargetEvidence();
     sb.from('post').select('*').eq('userId', me.id).order('createdAt', { ascending: false }).then(function (r) {
       if (r.error) throw r.error;
       var posts = r.data || [];
@@ -279,6 +281,93 @@
         posts.forEach(function (p) { list.appendChild(postRow(p, likes[p.id] || 0, comments[p.id] || 0)); });
       });
     }).catch(function (err) { $('postList').innerHTML = '<p class="form-error"></p>'; $('postList').firstChild.textContent = friendly(err); });
+  }
+
+  // Green Targets evidence is stored in IndexedDB by the SDG page under
+  // the same origin. Show the signed-in student's records in My Home too.
+  function renderGreenTargetEvidence() {
+    var list = $('greenTargetList');
+    if (!list) return;
+    function openEvidenceDB() {
+      return new Promise(function (resolve, reject) {
+        var request = indexedDB.open('ips-green-evidence', 1);
+        request.onupgradeneeded = function () {
+          if (!request.result.objectStoreNames.contains('submissions')) {
+            request.result.createObjectStore('submissions', { keyPath: 'key' });
+          }
+        };
+        request.onsuccess = function () { resolve(request.result); };
+        request.onerror = function () { reject(new Error('Browser storage is unavailable.')); };
+      });
+    }
+    openEvidenceDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction('submissions', 'readonly');
+        var request = tx.objectStore('submissions').getAll();
+        request.onsuccess = function () {
+          // Include only this account's evidence. Guest evidence is not silently
+          // attributed to a signed-in account.
+          resolve((request.result || []).filter(function (item) { return item.owner === me.id; }));
+        };
+        request.onerror = function () { reject(new Error('Could not read Green Targets evidence.')); };
+        tx.oncomplete = function () { db.close(); };
+        tx.onerror = function () { db.close(); };
+      });
+    }).then(function (records) {
+      if (!list.isConnected) return;
+      list.innerHTML = '';
+      if (!records.length) {
+        var empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.innerHTML = '<div class="big">🌱</div><p>No Green Targets evidence found for this account in this browser yet.</p><div class="actions" style="justify-content:center"><a class="btn" href="index.html?view=targets">🎯 Open Green Targets</a></div>';
+        list.appendChild(empty);
+        return;
+      }
+      records.sort(function (a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); });
+      var grid = document.createElement('div');
+      grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px';
+      records.forEach(function (record) {
+        var g = goal(record.sdgId);
+        var card = document.createElement('article');
+        card.style.cssText = 'border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff';
+        var media;
+        if (record.media && record.mediaType && record.mediaType.indexOf('video/') === 0) {
+          media = document.createElement('video');
+          media.controls = true;
+        } else {
+          media = document.createElement('img');
+          media.alt = 'Green Targets evidence for SDG ' + record.sdgId;
+        }
+        media.style.cssText = 'display:block;width:100%;height:190px;object-fit:cover;background:#eef5ef';
+        if (record.media) {
+          var objectUrl = URL.createObjectURL(record.media);
+          media.src = objectUrl;
+          media.addEventListener('load', function () { /* object URL remains valid while card is displayed */ }, { once: true });
+          media.addEventListener('error', function () { URL.revokeObjectURL(objectUrl); }, { once: true });
+        }
+        var body = document.createElement('div');
+        body.style.cssText = 'padding:14px';
+        var badge = document.createElement('span');
+        badge.className = 'goal-badge';
+        badge.textContent = g ? 'SDG ' + g[0] + ' · ' + g[1] : 'SDG ' + record.sdgId;
+        badge.style.background = g ? g[2] : '#16a34a';
+        var desc = document.createElement('p');
+        desc.className = 'post-desc';
+        desc.textContent = record.description || '';
+        var meta = document.createElement('p');
+        meta.className = 'post-meta';
+        meta.textContent = 'Green Targets · ' + (record.createdAt ? when(record.createdAt) : 'Saved in this browser');
+        body.appendChild(badge);
+        body.appendChild(desc);
+        body.appendChild(meta);
+        card.appendChild(media);
+        card.appendChild(body);
+        grid.appendChild(card);
+      });
+      list.appendChild(grid);
+    }).catch(function (err) {
+      if (list.isConnected) list.textContent = 'Could not load Green Targets evidence: ' + friendly(err);
+    });
   }
 
   function postRow(p, likeCount, commentCount) {
