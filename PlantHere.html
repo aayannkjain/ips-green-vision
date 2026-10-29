@@ -247,12 +247,25 @@ function searchForSpots(lat,lng){
     ');out center qt 120;';
 
   var myRequest=++searchCounter;   // ignore answers from older searches
-  fetchSpots(q,lat,lng,searchRadius)
+  function note(text){document.getElementById("locationInfo").innerHTML+='<br><span id="mapNote" style="color:#9ca3af;font-size:12px">'+text+'</span>'}
+  function show(data){
+    document.getElementById("spotLoading").style.display="none";
+    document.getElementById("spotDetail").style.display="none";
+    spotMarkers.forEach(function(m){map.removeLayer(m)});spotMarkers=[];
+    processSpots((data&&data.elements)||[],lat,lng);
+  }
+  fetchSpots(q,lat,lng,searchRadius,{
+    // The full map data arrived after the parks-only list was shown: replace the list
+    late:function(full){if(myRequest!==searchCounter)return;show(full);},
+    // The full map data never arrived
+    lateFail:function(){if(myRequest!==searchCounter)return;var n=document.getElementById("mapNote");if(n)n.textContent="ℹ The main map servers are busy, so only parks and gardens are shown. Search again in a minute for roadsides and open land.";}
+  })
   .then(function(data){
     if(myRequest!==searchCounter)return;
-    document.getElementById("spotLoading").style.display="none";
-    processSpots((data&&data.elements)||[],lat,lng);
-    if(data.source==="backup")document.getElementById("locationInfo").innerHTML+='<br><span style="color:#9ca3af;font-size:12px">ℹ The main map server is busy, so only parks and gardens are shown. Try again later for roadsides and open land.</span>';
+    show(data);
+    if(data.source==="backup")note(data.overFailed
+      ?"ℹ The main map servers are busy, so only parks and gardens are shown. Search again in a minute for roadsides and open land."
+      :"⏳ Showing parks and gardens first. Still loading roadsides and open land from the main map servers…");
   })
   .catch(function(err){
     if(myRequest!==searchCounter)return;
@@ -394,10 +407,15 @@ function advice(s,t,r,sp,z,sv){
 }
 
 // ===== OVERPASS (OpenStreetMap) REQUEST =====
-// Asks three public Overpass servers at the same time and uses whichever
-// answers first. (GitHub Pages cannot run a server-side proxy, so the page
-// talks to these servers directly.)
+// Asks several public Overpass servers at the same time and uses whichever
+// answers first. GitHub Pages cannot run a server-side proxy, so the main
+// server (overpass-api.de) is reached in two ways:
+//   1. through our Supabase Edge Function "overpass" (replaces the old Netlify proxy)
+//   2. directly from the browser
+// If either is unavailable, the other servers still answer.
 var OVERPASS_SERVERS=[
+  "https://vwxtgkiebomarbuhxexd.supabase.co/functions/v1/overpass",
+  "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter"
@@ -417,7 +435,8 @@ function askServer(url,query,ms){
     return res.json();
   }).then(function(data){
     if(timer)clearTimeout(timer);
-    if(!data||!Array.isArray(data.elements))throw new Error("Unexpected response");
+    if(!data||!Array.isArray(data.elements)){console.warn("Overpass server failed:",url,"unexpected response");throw new Error("Unexpected response")}
+    console.info("Map data received from:",url);   // shows in F12 → Console which server answered
     return data;
   },function(err){
     if(timer)clearTimeout(timer);
@@ -476,11 +495,15 @@ function backupSearch(lat,lng,km){
 
 // Runs Overpass and the backup search at the same time.
 // Overpass gives the most complete results, so it gets up to 12 s;
-// after that, whichever has an answer is used.
-function fetchSpots(query,lat,lng,km){
-  var cacheKey="ips-spots:"+query;   // re-use a recent answer for the same search
-  try{var hit=JSON.parse(sessionStorage.getItem(cacheKey)||"null");if(hit&&Date.now()-hit.t<30*60*1000)return Promise.resolve(hit.v)}catch(_){}
-  function save(v){if(v.elements.length){try{sessionStorage.setItem(cacheKey,JSON.stringify({t:Date.now(),v:v}))}catch(_){}}return v}
+// after that, whichever has an answer is used. If the parks-only backup was
+// shown and Overpass answers later, on.late(fullResult) replaces the list
+// (on.lateFail() is called if Overpass never answers).
+function fetchSpots(query,lat,lng,km,on){
+  on=on||{};
+  var cacheKey="ips-spots:"+query;   // re-use a recent FULL answer for the same search
+  try{var hit=JSON.parse(sessionStorage.getItem(cacheKey)||"null");if(hit&&hit.v&&hit.v.source==="overpass"&&Date.now()-hit.t<30*60*1000)return Promise.resolve(hit.v)}catch(_){}
+  // Only full Overpass answers are remembered; the parks-only backup never is
+  function save(v){if(v.source==="overpass"&&v.elements.length){try{sessionStorage.setItem(cacheKey,JSON.stringify({t:Date.now(),v:v}))}catch(_){}}return v}
 
   var over=fetchOverpass(query).then(function(d){return{elements:d.elements,source:"overpass"}});
   var back=backupSearch(lat,lng,km).then(function(e){return{elements:e,source:"backup"}});
@@ -491,10 +514,17 @@ function fetchSpots(query,lat,lng,km){
     function finish(v){if(!done){done=true;resolve(save(v))}}
     function check(){
       if(done)return;
-      if(backResult&&(overFailed||grace))return finish(backResult);
+      if(backResult&&(overFailed||grace)){backResult.overFailed=overFailed;return finish(backResult)}
       if(overFailed&&backFailed){done=true;reject(new Error("All map data services failed"))}
     }
-    over.then(finish,function(){overFailed=true;check()});
+    over.then(function(v){
+      if(!done)return finish(v);
+      save(v);if(on.late)on.late(v);           // arrived after the backup was shown
+    },function(){
+      overFailed=true;
+      if(done){if(on.lateFail)on.lateFail();return}
+      check();
+    });
     back.then(function(v){backResult=v;check()},function(){backFailed=true;check()});
     setTimeout(function(){grace=true;if(!done)document.getElementById("locationInfo").innerHTML="📡 Still searching map data...";check()},12000);
   });
