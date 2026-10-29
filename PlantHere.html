@@ -410,11 +410,11 @@ function advice(s,t,r,sp,z,sv){
 // Asks several public Overpass servers at the same time and uses whichever
 // answers first. GitHub Pages cannot run a server-side proxy, so the main
 // server (overpass-api.de) is reached in two ways:
-//   1. through our Supabase Edge Function "overpass" (replaces the old Netlify proxy)
+//   1. through our Supabase Edge Function "smooth-handler" (replaces the old Netlify proxy)
 //   2. directly from the browser
 // If either is unavailable, the other servers still answer.
 var OVERPASS_SERVERS=[
-  "https://vwxtgkiebomarbuhxexd.supabase.co/functions/v1/overpass",
+  "https://vwxtgkiebomarbuhxexd.supabase.co/functions/v1/smooth-handler",
   "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",

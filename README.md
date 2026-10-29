@@ -40,14 +40,14 @@ server (`overpass-api.de`) reliably, it uses a small pass-through on Supabase, w
 replaces the old Netlify proxy. Set it up once:
 
 1. Supabase dashboard → **Edge Functions** → **Deploy a new function** → **Via Editor**.
-2. Name the function exactly **`overpass`**.
+2. The function is named **`smooth-handler`** (the name Supabase gave it; the page uses this name).
 3. Delete the sample code, paste the whole of `supabase/functions/overpass/index.ts`, click **Deploy**.
 4. Open the function's settings (**Details**) and switch **off** JWT verification
    ("Verify JWT with legacy secret" / "Enforce JWT verification"), then **Save**.
    This is needed because the site's publishable key is not a JWT. The function only
    accepts requests from `https://aayannkjain.github.io`, so it is not an open proxy.
 5. Check: open the Plant a Tree page, press F12 → Console, and search. No
-   "Overpass server failed: …supabase.co…" warning means it works.
+   "Overpass server failed: …supabase.co/functions/v1/smooth-handler…" warning means it works.
 
 If the function is not set up (or the Supabase project is paused), the page still works
 using the other servers. The `supabase/` folder can be uploaded to GitHub with the
@@ -62,4 +62,4 @@ If you move the site to another address, add it to `ALLOWED_ORIGINS` in the func
 - The free Supabase plan pauses a project after about a week with no visitors. If login stops
   working, open the Supabase dashboard and click **Restore project**.
 - Netlify's `netlify.toml` is not needed on GitHub. The Plant a Tree page talks to the
-  public OpenStreetMap servers directly and through the Supabase `overpass` function.
+  public OpenStreetMap servers directly and through the Supabase `smooth-handler` function.
