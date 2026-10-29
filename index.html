@@ -529,23 +529,43 @@ async function shrinkImage(file) {
 }
 
 function AddPostForm({ sdg, onCancel, onPosted }) {
-  const [blob, setBlob] = useState(null);
-  const [preview, setPreview] = useState("");
+  const [files, setFiles] = useState([]);
+  const [previews, setPreviews] = useState([]);
   const [desc, setDesc] = useState("");
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState("");
   const [formError, setFormError] = useState("");
   const fileRef = useRef(null);
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
-  const pickFile = async (e) => {
-    const file = e.target.files?.[0];
-    setBlob(null); setPreview(""); setErrors(x => ({ ...x, image: "" }));
-    if (!file) return;
-    setBusy("Preparing image…");
-    try { const b = await shrinkImage(file); setBlob(b); setPreview(URL.createObjectURL(b)); }
-    catch (err) { setErrors(x => ({ ...x, image: err.message })); if (fileRef.current) fileRef.current.value = ""; }
-    setBusy("");
+  useEffect(() => () => { previews.forEach(url => URL.revokeObjectURL(url)); }, [previews]);
+
+  const pickFiles = async (e) => {
+    const selected = Array.from(e.target.files || []);
+    setFiles([]);
+    previews.forEach(url => URL.revokeObjectURL(url));
+    setPreviews([]);
+    setErrors(x => ({ ...x, image: "" }));
+    if (!selected.length) return;
+    if (selected.length > 10) {
+      setErrors(x => ({ ...x, image: "Please select up to 10 images at a time." }));
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    setBusy(`Preparing ${selected.length} file${selected.length === 1 ? "" : "s"}…`);
+    try {
+      const prepared = [];
+      for (const file of selected) {
+        if (!file.type.startsWith("image/")) throw new Error(`"${file.name}" is not an image. Please choose JPG, PNG or WEBP files.`);
+        prepared.push({ name: file.name, blob: await shrinkImage(file) });
+      }
+      setFiles(prepared);
+      setPreviews(prepared.map(item => URL.createObjectURL(item.blob)));
+    } catch (err) {
+      setErrors(x => ({ ...x, image: err.message }));
+      if (fileRef.current) fileRef.current.value = "";
+    } finally {
+      setBusy("");
+    }
   };
 
   const submit = async (e) => {
@@ -553,26 +573,37 @@ function AddPostForm({ sdg, onCancel, onPosted }) {
     setFormError("");
     const text = desc.trim();
     const errs = {
-      image: blob ? "" : (errors.image || "Please upload an image."),
+      image: files.length ? "" : (errors.image || "Please upload at least one image."),
       desc: !text ? "Please describe what you did for this goal." : text.length > MAX_DESC ? "Description must be 500 characters or fewer." : "",
     };
     setErrors(errs);
     if (errs.image || errs.desc) return;
     setBusy("Posting…");
-    let path = null;
+    const uploadedPaths = [];
     try {
       const sb = await getSupabase();
       const { data } = await sb.auth.getSession();
       const user = data && data.session && data.session.user;
       if (!user) throw new Error("not authenticated");
-      path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-      const up = await sb.storage.from("post-images").upload(path, blob, { contentType: "image/jpeg", upsert: false });
-      if (up.error) { path = null; throw up.error; }
-      const ins = await sb.from("post").insert({ userId: user.id, goalId: sdg.id, description: text, imagePath: path });
+
+      // The current database schema stores one imagePath per post, so each
+      // selected image is saved as its own post with the same description.
+      for (const item of files) {
+        const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+        const up = await sb.storage.from("post-images").upload(path, item.blob, { contentType: "image/jpeg", upsert: false });
+        if (up.error) throw up.error;
+        uploadedPaths.push(path);
+      }
+      const rows = uploadedPaths.map(path => ({
+        userId: user.id, goalId: sdg.id, description: text, imagePath: path
+      }));
+      const ins = await sb.from("post").insert(rows);
       if (ins.error) throw ins.error;
       onPosted();
     } catch (err) {
-      if (path) { try { (await getSupabase()).storage.from("post-images").remove([path]); } catch {} }
+      if (uploadedPaths.length) {
+        try { await (await getSupabase()).storage.from("post-images").remove(uploadedPaths); } catch {}
+      }
       setFormError(friendlyPostError(err));
       setBusy("");
     }
@@ -583,14 +614,19 @@ function AddPostForm({ sdg, onCancel, onPosted }) {
   return (
     <form onSubmit={submit} noValidate style={{ background: T.card, border: `2px solid ${sdg.color}`, borderRadius: 16, padding: 24, marginBottom: 28, boxShadow: T.shadow }}>
       <h2 style={{ margin: "0 0 4px", fontSize: 19, fontWeight: 700, color: T.text, fontFamily: "'Outfit',sans-serif" }}>➕ Add a post for SDG {sdg.id}</h2>
-      <p style={{ margin: 0, fontSize: 13, color: T.textSec, fontFamily: "'DM Sans',sans-serif" }}>All fields are required. Your post will appear in Community with your first and last name.</p>
+      <p style={{ margin: 0, fontSize: 13, color: T.textSec, fontFamily: "'DM Sans',sans-serif" }}>Upload multiple photos for your action. Each photo will appear as a separate Community post with the same description.</p>
 
-      <label htmlFor="post-image" style={label}>Upload image <span style={{ color: "#DC2626" }}>*</span></label>
-      <input ref={fileRef} id="post-image" type="file" accept="image/*" onChange={pickFile} disabled={!!busy} aria-invalid={!!errors.image}
+      <label htmlFor="post-image" style={label}>Upload images <span style={{ color: "#DC2626" }}>*</span></label>
+      <input ref={fileRef} id="post-image" type="file" accept="image/*" multiple onChange={pickFiles} disabled={!!busy} aria-invalid={!!errors.image}
         style={{ display: "block", width: "100%", padding: 12, border: `2px dashed ${errors.image ? "#DC2626" : T.border}`, borderRadius: 12, background: T.bg, fontFamily: "'DM Sans',sans-serif", cursor: "pointer" }} />
-      <div style={{ fontSize: 12, color: T.muted, marginTop: 6, fontFamily: "'DM Sans',sans-serif" }}>JPG, PNG or WEBP. Large photos are shrunk automatically to 2 MB or less.</div>
+      <div style={{ fontSize: 12, color: T.muted, marginTop: 6, fontFamily: "'DM Sans',sans-serif" }}>Select up to 10 JPG, PNG or WEBP images. Each image is automatically compressed to 2 MB or less.</div>
       {errors.image && <div role="alert" style={err}>{errors.image}</div>}
-      {preview && <img src={preview} alt="Selected image preview" style={{ display: "block", marginTop: 12, maxWidth: "100%", maxHeight: 260, borderRadius: 12, objectFit: "contain", background: T.bg }} />}
+      {previews.length > 0 && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(110px,1fr))", gap: 10, marginTop: 14 }}>
+        {previews.map((src, i) => <div key={src} style={{ minWidth: 0 }}>
+          <img src={src} alt={`Selected image ${i + 1}`} style={{ display: "block", width: "100%", height: 110, borderRadius: 10, objectFit: "cover", background: T.bg }} />
+          <div style={{ fontSize: 11, color: T.textSec, marginTop: 4, overflowWrap: "anywhere" }}>{files[i]?.name}</div>
+        </div>)}
+      </div>}
 
       <label htmlFor="post-desc" style={label}>Description <span style={{ color: "#DC2626" }}>*</span></label>
       <textarea id="post-desc" value={desc} maxLength={MAX_DESC} rows={4} disabled={!!busy} aria-invalid={!!errors.desc}
@@ -602,7 +638,7 @@ function AddPostForm({ sdg, onCancel, onPosted }) {
 
       {formError && <div role="alert" style={{ marginTop: 14, padding: "10px 12px", borderRadius: 8, background: "#FFF1F2", color: "#B91C1C", fontSize: 13, fontFamily: "'DM Sans',sans-serif" }}>{formError}</div>}
       <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
-        <button type="submit" disabled={!!busy} style={{ minHeight: 44, padding: "0 26px", border: 0, borderRadius: 10, background: sdg.color, color: "#fff", fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, fontFamily: "'DM Sans',sans-serif" }}>{busy || "Post"}</button>
+        <button type="submit" disabled={!!busy} style={{ minHeight: 44, padding: "0 26px", border: 0, borderRadius: 10, background: sdg.color, color: "#fff", fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, fontFamily: "'DM Sans',sans-serif" }}>{busy || `Post ${files.length || ""} image${files.length === 1 ? "" : "s"}`}</button>
         <button type="button" onClick={onCancel} disabled={busy === "Posting…"} style={{ minHeight: 44, padding: "0 18px", border: 0, borderRadius: 10, background: "transparent", color: T.textSec, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>Cancel</button>
       </div>
     </form>
